@@ -81,7 +81,7 @@ def main(C, K, a, b, binary):
     print("Testing model...")
     n, n_corr = 0, 0
     upload = []
-    for i, batch in enumerate(test_iter):
+    for i, batch in enumerate(val_iter):
         X = utils.bag_of_words(batch, text_field).data.numpy()
         if binary:
             X = X > 0
@@ -104,9 +104,9 @@ def main(C, K, a, b, binary):
 
 if __name__ == '__main__':
     C = 2
-    K = 2
-    a = 1
-    b = 0.5
-    binary = True
+    K = 11
+    a = 0
+    b = 1.5
+    binary = False
     print('>>> alpha = {}, beta = {}, binary features = {}'.format(a, b, binary))
     print('acc = ', main(C, K, a, b, binary))

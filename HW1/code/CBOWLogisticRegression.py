@@ -22,15 +22,13 @@ def main(n_epochs, learning_rate):
     n_classes = len(label_field.vocab) - 1
     model = nn.Sequential(
         nn.Linear(input_size, n_classes),
-        nn.Linear(n_classes, n_classes),
-        nn.Linear(n_classes, n_classes),
     )
 
     # model = LogisticRegression(input_size, n_classes)
 
     # loss and optimizer (softmax is internally computed)
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
     print("Training model...")
     for epoch in range(n_epochs):
@@ -69,7 +67,7 @@ def main(n_epochs, learning_rate):
     return n_corr / n
 
 if __name__ == '__main__':
-    n_epochs = 100
-    learning_rate = 0.05
+    n_epochs = 50
+    learning_rate = 0.01
     print('>>> n_epochs = {}, learning_rate = {}'.format(n_epochs, learning_rate))
     print('acc = ', main(n_epochs, learning_rate))

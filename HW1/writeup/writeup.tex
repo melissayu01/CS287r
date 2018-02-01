@@ -1,7 +1,8 @@
 
 \documentclass[11pt]{article}
-
+\usepackage{natbib}
 \usepackage{common}
+
 \title{HW1: Classification}
 \author{Alex Lin \\ alexanderlin01@college.harvard.edu \and Melissa Yu \\ melissayu@college.harvard.edu }
 \begin{document}
@@ -23,6 +24,13 @@ It is common for $\boldx_i$ to be a one-hot encoding with size $|\mcV|$.  Howeve
 We trained the four different models specified in the instructions.  These included (1) a Multivariate Naive Bayes unigram classifier, (2) a logistic regression model over word types, (3) a continuous bag-of-words neural network with embeddings, and (4) a convolutional neural network.  We also tried a combination model in which we combined (1) and (4) in an attempt to achieve better accuracy.  
 
 \subsection{Multivariate Naive Bayes}
+For the sake of convenience, we map the labels $y\in\{1, 2\}$ to $y\in\{-1, 1\}$ in this model. The Naive Bayes model is a linear classifier of the form
+\[
+y = \text{sign}(\boldw^\trans \boldx + b),
+\]
+where $\boldw = \log\left(\frac{\boldp / \lVert\boldp\rVert_1}{\boldq / \lVert\boldq\rVert_1}\right)$ and $b = \log(N_+ / N_-)$. Here, the feature vectors $\boldx\in\mathbb{R}^{\lvert \mathcal{V}\rvert}$ are simply binarized bag-of-words vectors representing each sentence in the text. Note that $\boldp = \alpha + \sum_{i: y_i = 1} \boldx_i}$ and $\boldq = \alpha + \sum_{i: y_i = -1} \boldx_i}$ are count vectors for the training data with smoothing parameter $\alpha = 0.5$. We do not use a smoothing parameter (prior) for the class distribution.
+
+Additionally, we also experiment with non-binarized feature vectors, where each feature can be understood to follow a catergorical distribution over counts having a Dirichlet prior.
 
 \subsection{Logistic Regression}
 The logistic regression model involved takes in a vector representation of a sentence $\boldx$, applies a linear function with weights $\boldw$ and bias $b$, and uses a sigmoid transformation to return the probability of that sentence having positive sentiment $p$.  That is,
@@ -37,6 +45,9 @@ L(\boldw, b) + \lambda \| \boldw \|_2
 \end{align*}
 
 \subsection{Continuous Bag-of-Words}
+For this model, we utilize pre-trained word embeddings of length 300 generated using the skip-gram word2vec model, which have been shown to yield better results than the CBOW word2vec embeddings. After embedding all words in each sentence, we pool the embeddings per sentence by taking the sum, and then apply a simple logistic regression model for classification. 
+
+As in the previous section, we train the weights and bias of the model using the Adam optimizer and adopt the learning rate 0.01. We optimize the same loss function described previously.
 
 \subsection{Convolutional Neural Network}
 For the convolutional neural network, we first utilize the classic \texttt{word2vec} transformation to convert between words in sentences and their continuous vector representations.  For each word in a sentence, we have a 300-by-1 vector.  Then, we apply three sets of convolutions with kernel sizes of $h = 3, 4, 5$ and 100 out-channels each.  The resultant values for each kernel size and out-channel are first put through a rectified linear activation function and then pooled over time.  Thus, each original sentence becomes mapped to a 300-feature vector.  This vector is then passed through an affine transformation with weights $\boldw$ and bias $b$, giving us a single value that we pass through a sigmoid activation to generate $p$, the probability of the original sentence having positive sentiment.  
@@ -57,8 +68,9 @@ We performed several experiments to tune the hyper-parameters of our models.  Pe
  Model &  & Acc. \\
  \midrule
  \textsc{Baseline (Single Class)} & & 0.538\\
- \textsc{Multivariate Naive Bayes} & &  \\
- \textsc{Logistic Regression} & & 0.797  \\
+ \textsc{Multivariate Naive Bayes (Binary)} & & 0.822 \\
+ \textsc{Multivariate Naive Bayes} & & 0.751 \\
+ \textsc{Logistic Regression} & & 0.797 \\
  \textsc{Continuous Bag-of-Words} & & \\
  \textsc{Convolutional Neural Network} & & 0.802 \\
  \textsc{Multivariate Naive Bayes + Convolutional Neural Network}  & & 0.805 \\
@@ -67,25 +79,27 @@ We performed several experiments to tune the hyper-parameters of our models.  Pe
 \caption{\label{tab:results} Classification accuracies of our models.}
 \end{table}
 
-
 \subsection{Multivariate Naive Bayes} 
+Firstly, we experimented with non-binarized features for MNB. In this setting, the feature vectors were bag-of-words counts over each sentence, with symmetric Dirichlet priors over the possible feature count space $[0, 10]$. After tuning the smoothing parameter to $\alpha = 0.5$ using grid search on the validation set, we achieved a best test set accuracy of 0.751. 
+
+We conducted a similar tuning process over the validation set for $\alpha$ in the case of binarized features, and achieved a best test set accuracy of 0.822 when $\alpha = 0.5$. The superior performance of binarized MNB compared to standard MNB is unsurprising given the literature.
 
 \subsection{Logistic Regression}
 
 \subsection{Continuous Bag-of-Words}
+Using the summed CBOW word embeddings as the inputs to the logistic regression model, we perform a similar hyper-parameter tuning procedure as before; we pool the train and validation sets generated by Torchtext's data loader and use 5-fold cross-validation to select a learning rate. After finding that CBOW + logistic regression did not yield very good results, we additionally explored the use of deeper models with 2 hidden layers, but did not obtain good results.
 
 \subsection{Convolutional Neural Network}
 
 \subsection{Multivariate Naive Bayes + Convolutional Neural Network}
 
 
-
-
 \section{Conclusion}
+Using the Stanford Sentiment Treebank dataset, we have evaluated the performance of four standard sentiment classification models and one additional ``hybrid'' model, and have found that the simplest model, Multivariate Naive Bayes, performs the best. These results strongly illustrate the superior performance of MNB on short snippets. With the findings of \citeauthor{wang2012baselines} in mind, we envision that the application of bigrams to the MNB model has the potential to further improve classification accuracy.
 
-End the write-up with a very short recap of the main experiments and the main results. Describe any challenges you may have faced, and what could have been improved in the model.
 
-\bibliographystyle{apalike}
 \bibliography{writeup}
+\nocite{*}
+\bibliographystyle{apalike}
 
 \end{document}
