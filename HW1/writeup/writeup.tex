@@ -84,6 +84,14 @@ Firstly, we experimented with non-binarized features for MNB. In this setting, t
 
 We conducted a similar tuning process over the validation set for $\alpha$ in the case of binarized features, and achieved a best test set accuracy of 0.822 when $\alpha = 0.5$. The superior performance of binarized MNB compared to standard MNB is unsurprising given the literature.
 
+\begin{center}
+	\begin{tabular}{ c | c c c c c}
+		$\alpha$ & $1$ & $0.5$ & $0.1$ & $0.01$ \\
+		\hline
+		Valid Set Acc. & 0.629 & 0.791 & 0.768 & 0.764 
+	\end{tabular}
+\end{center}
+
 \subsection{Logistic Regression}
 
 As specified earlier, we primarily tuned the regularization parameters $\lambda$.  We tried values of $\lambda = 10^{-2}, 10^{-3}, 10^{-4}, 10^{-5}, 10^{-6}$.  Here are the corresponding accuracies on the validation set.
@@ -133,7 +141,7 @@ In the combined Multivariate Naive Bayes and Convolutional Neural Network model,
 
 
 \section{Conclusion}
-Using the Stanford Sentiment Treebank dataset, we have evaluated the performance of four standard sentiment classification models and one additional ``hybrid'' model, and have found that the simplest model, Multivariate Naive Bayes, performs the best. These results strongly illustrate the superior performance of MNB on short snippets. With the findings of \citeauthor{wang2012baselines} in mind, we envision that the application of bigrams to the MNB model has the potential to further improve classification accuracy.
+Using the Stanford Sentiment Treebank dataset, we have evaluated the performance of four standard sentiment classification models and one additional ``hybrid'' model, and have found that the simplest model, Multivariate Naive Bayes, performs the best. These results strongly illustrate the superior performance of MNB on short snippets. With the findings of [5] in mind, we envision that the application of bigrams to the MNB model has the potential to further improve classification accuracy.
 
 Perhaps the most important takeaway of this exercise is that overly complex models may perform significantly more poorly in practice than the simplest idea.  
 
