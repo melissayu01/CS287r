@@ -1,5 +1,9 @@
+import torch
+from torch.autograd import Variable
 import torchtext
 from torchtext.vocab import Vectors
+
+DATA_DIR = '../data/'
 
 def load_PTB(dev, use_pretrained_embeddings, batch_size, bptt_len,
              repeat=False, shuffle=False):
@@ -12,7 +16,7 @@ def load_PTB(dev, use_pretrained_embeddings, batch_size, bptt_len,
     TEXT = torchtext.data.Field()
 
     train, val, test = torchtext.datasets.LanguageModelingDataset.splits(
-        path="../data/", text_field=TEXT,
+        path=DATA_DIR, text_field=TEXT,
         train=("train.5k.txt" if dev else "train.txt"),
         validation="valid.txt", test="valid.txt")
     train_iter, val_iter, test_iter = torchtext.data.BPTTIterator.splits(
@@ -28,3 +32,18 @@ def load_PTB(dev, use_pretrained_embeddings, batch_size, bptt_len,
     print('Size of text batch [max bptt length, batch size] = {}, {}'.format(bptt_len, batch_size))
 
     return train_iter, val_iter, test_iter, TEXT
+
+def load_kaggle(TEXT):
+    '''
+    returns list of tensors representing sentence fragments
+    '''
+    print('Loading PTB data...')
+
+    out = []
+    for line in open(DATA_DIR + "input.txt"):
+        words = line.strip(' _\t\n\r').split()
+        word_indexes = [TEXT.vocab.stoi[word] for word in words]
+        out.append(Variable(torch.LongTensor(word_indexes), requires_grad=False))
+
+    print('len(kaggle) = {}'.format(len(out)))
+    return out

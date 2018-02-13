@@ -10,9 +10,39 @@ import utils
 from NNLM import NNLM
 
 torch.set_printoptions(precision=4)
+PREDS_DIR = '../predictions/'
+MODELS_DIR = '../models/'
 
 
-def evaluate(epoch, model, data_loader, TEXT, criterion, args):
+def make_predictions(model, TEXT, ngram, criterion, pred_file):
+    model.eval()
+    test = utils.load_kaggle(TEXT)
+
+    n = ngram
+    padding_idx = TEXT.vocab.stoi["<pad>"]
+    ntokens = 0
+    total_loss = 0
+
+    with open(PREDS_DIR+pred_file, "w") as fout:
+        print("id,word", file=fout)
+        for i, vec in enumerate(test, start=1):
+            data, targets = vec.unfold(0, n-1, 1), vec[n-1:]
+            output = model(data)
+
+            _, indices = torch.topk(output[-1], k=20)
+            predictions = [TEXT.vocab.itos[i] for i in indices.data.tolist()]
+            print("%d,%s"%(i, " ".join(predictions)), file=fout)
+
+            total_loss += criterion(output[:-1], targets).data
+            ntokens += targets.ne(padding_idx).int().sum().data
+
+    pred_loss = total_loss[0] / ntokens[0]
+    print('=' * 89)
+    print('| End of predicting | kaggle loss {:5.2f} | kaggle ppl {:8.2f}'.format(
+        pred_loss, math.exp(pred_loss)))
+    print('=' * 89)
+
+def evaluate(model, data_loader, TEXT, criterion, args):
     model.eval()
 
     n = args.ngram
@@ -101,6 +131,8 @@ def main():
                         help='report interval')
     parser.add_argument('--save', type=str,  default='model.pt',
                         help='path to save the final model')
+    parser.add_argument('--kaggle', type=str,  default='',
+                        help='path to save kaggle predictions')
     parser.add_argument('--dev', action='store_true',
                         help='use dev mode')
     args = parser.parse_args()
@@ -118,6 +150,7 @@ def main():
         dev=args.dev, use_pretrained_embeddings=args.use_pretrained_em,
         batch_size=args.batch_size, bptt_len=args.bptt_len)
 
+    # Intialize model, loss, and optimizers.
     model = NNLM(n=args.ngram, V=len(TEXT.vocab),
                  m=(TEXT.vocab.vectors.size(1) if args.use_pretrained_em else args.emsize),
                  h=args.nhid, max_norm=args.em_maxnorm,
@@ -128,7 +161,7 @@ def main():
         size_average=False, ignore_index=TEXT.vocab.stoi["<pad>"])
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
-    # Train/test
+    # Train / Test.
     lr = args.lr
     best_val_loss = None
 
@@ -137,7 +170,7 @@ def main():
         for epoch in range(1, args.epochs+1):
             epoch_start_time = time.time()
             train(epoch, model, train_iter, TEXT, criterion, optimizer, args)
-            val_loss = evaluate(epoch, model, val_iter, TEXT, criterion, args)
+            val_loss = evaluate(model, val_iter, TEXT, criterion, args)
 
             # Log results
             print('-' * 89)
@@ -149,8 +182,7 @@ def main():
 
             # Save the model if the validation loss is the best we've seen so far.
             if not best_val_loss or val_loss < best_val_loss:
-                with open(args.save, 'wb') as f:
-                    torch.save(model, f)
+                torch.save(model, MODELS_DIR+args.save)
                 best_val_loss = val_loss
             else:
                 # Anneal the learning rate if no improvement has been seen in the validation dataset.
@@ -160,17 +192,21 @@ def main():
         print('Exiting from training early')
 
     # Load the best saved model.
-    with open(args.save, 'rb') as f:
+    with open(MODELS_DIR+args.save, 'rb') as f:
         model = torch.load(f)
 
     # Run on test data.
-    test_loss = evaluate(epoch, model, test_iter, TEXT, criterion, args)
+    test_loss = evaluate(model, test_iter, TEXT, criterion, args)
 
     # Log results
     print('=' * 89)
     print('| End of training | test loss {:5.2f} | test ppl {:8.2f}'.format(
         test_loss, math.exp(test_loss)))
     print('=' * 89)
+
+    # Make Kaggle predictions.
+    if args.kaggle:
+        make_predictions(model, TEXT, args.ngram, criterion, args.kaggle)
 
 if __name__ == '__main__':
     main()
