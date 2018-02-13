@@ -35,7 +35,7 @@ def load_PTB(dev, use_pretrained_embeddings, batch_size, bptt_len,
 
 def load_kaggle(TEXT):
     '''
-    returns list of tensors representing sentence fragments
+    returns list of Variables representing sentence fragments
     '''
     print('Loading Kaggle data...')
 
