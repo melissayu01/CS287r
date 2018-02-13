@@ -113,7 +113,7 @@ def main():
                         help='max norm for learned embeddings')
     parser.add_argument('--clip', type=float, default=0.25,
                         help='gradient clipping')
-    parser.add_argument('--epochs', type=int, default=40,
+    parser.add_argument('--epochs', type=int, default=10,
                         help='upper epoch limit')
     parser.add_argument('--batch_size', type=int, default=20, metavar='N',
                         help='batch size')
@@ -160,6 +160,8 @@ def main():
     criterion = torch.nn.CrossEntropyLoss(
         size_average=False, ignore_index=TEXT.vocab.stoi["<pad>"])
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, 'min', factor=0.5, patience=0, threshold=5e-3)
 
     # Train / Test.
     lr = args.lr
@@ -184,9 +186,9 @@ def main():
             if not best_val_loss or val_loss < best_val_loss:
                 torch.save(model, MODELS_DIR+args.save)
                 best_val_loss = val_loss
-            else:
-                # Anneal the learning rate if no improvement has been seen in the validation dataset.
-                lr /= 4.0
+
+            # Anneal the learning rate if no improvement has been seen in the validation dataset.
+            scheduler.step(val_loss)
     except KeyboardInterrupt:
         print('-' * 89)
         print('Exiting from training early')

@@ -1,7 +1,7 @@
 import torch
 from torch.autograd import Variable
 import torchtext
-from torchtext.vocab import Vectors
+from torchtext.vocab import Vectors, GloVe
 
 DATA_DIR = '../data/'
 
@@ -25,8 +25,9 @@ def load_PTB(dev, use_pretrained_embeddings, batch_size, bptt_len,
 
     TEXT.build_vocab(train, max_size=1000 if dev else None)
     if use_pretrained_embeddings:
-        url = 'https://s3-us-west-1.amazonaws.com/fasttext-vectors/wiki.simple.vec'
-        TEXT.vocab.load_vectors(vectors=Vectors('wiki.simple.vec', url=url))
+        TEXT.vocab.load_vectors(vectors=GloVe(name='6B'))
+        # url = 'https://s3-us-west-1.amazonaws.com/fasttext-vectors/wiki.simple.vec'
+        # TEXT.vocab.load_vectors(vectors=Vectors('wiki.simple.vec', url=url))
 
     print('len(TEXT.vocab) = {}'.format(len(TEXT.vocab)))
     print('Size of text batch [max bptt length, batch size] = {}, {}'.format(bptt_len, batch_size))

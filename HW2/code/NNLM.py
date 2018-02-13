@@ -14,7 +14,7 @@ class NNLM(nn.Module):
         self.h = h
 
         self.embedding = nn.Embedding(V, m, max_norm=max_norm)
-        if embeddings:
+        if embeddings is not None:
             self.embedding.weight = nn.Parameter(embeddings)
         self.skip_connection = nn.Linear((n-1) * m, V, bias=False)
         self.pass_through = nn.Sequential(
