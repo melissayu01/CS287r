@@ -37,7 +37,7 @@ def load_kaggle(TEXT):
     '''
     returns list of tensors representing sentence fragments
     '''
-    print('Loading PTB data...')
+    print('Loading Kaggle data...')
 
     out = []
     for line in open(DATA_DIR + "input.txt"):
