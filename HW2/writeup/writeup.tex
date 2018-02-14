@@ -14,49 +14,56 @@ Language modeling is a very interesting problem that has experienced much develo
 
 \section{Problem Description}
 
-Given a sequence of words encoded as vectors $\boldx_1, \boldx_2, \ldots, \boldx_N$, the objective is to accurately predict the distribution of $\boldx_{N + 1} \vert \boldx_1, \ldots, \boldx_{N}$.  Let $p$ be the true distribution and $q$ be an approximation to this distribution.   
+Let $\mathcal{V}$ be the vocabulary.  We assume words are represented as one-hot encoded vectors of size $\lvert \mathcal{V} \rvert \times 1$.  Given a sequence of words encoded as one-hot vectors $\boldx_1, \boldx_2, \ldots, \boldx_N$, the objective is to accurately predict the distribution of $\boldx_{n + 1} \vert \boldx_1, \ldots, \boldx_{n}$ for $n = 1, 2, \ldots, N$.  Let $q$ be our model's predictive distribution.  The objective is to adjust the model's parameters to minimize the \emph{average loss}, as defined by
+\begin{align*}
+L = \frac{1}{N} \sum_{n=1}^N \left(\ln q(\boldx_{n + 1} \vert \boldx_1, \ldots, \boldx_{n}) \right) \cdot x_{n+1} 
+\end{align*}
+where $\cdot$ denotes the inner dot product.  The standard metric used for evaluation is called \emph{perplexity}, as defined by
+\begin{align*}
+P = \exp L
+\end{align*}
 
 \section{Model and Algorithms}
 
-We trained the four different models specified in the instructions.  These included (1) a Multivariate Naive Bayes unigram classifier, (2) a logistic regression model over word types, (3) a continuous bag-of-words neural network with embeddings, and (4) a convolutional neural network.  We also tried a combination model in which we combined (1) and (4) in an attempt to achieve better accuracy.  
+We trained the three different models specified in the instructions.  These included (1) a basic trigram model, (2) a neural network language model (NNLM), and (3) a long short term memory recurrent network model (LSTM).
 
-\subsection{Multivariate Naive Bayes}
-For the sake of convenience, we map the labels $y\in\{1, 2\}$ to $y\in\{-1, 1\}$ in this model. The Naive Bayes model is a linear classifier of the form
-\[
-y = \text{sign}(\boldw^\trans \boldx + b),
-\]
-where $\boldw = \log\left(\frac{\boldp / \lVert\boldp\rVert_1}{\boldq / \lVert\boldq\rVert_1}\right)$ and $b = \log(N_+ / N_-)$. Here, the feature vectors $\boldx\in\mathbb{R}^{\lvert \mathcal{V}\rvert}$ are simply binarized bag-of-words vectors representing each sentence in the text. Note that $\boldp = \alpha + \sum_{i: y_i = 1} \boldx_i$ and $\boldq = \alpha + \sum_{i: y_i = -1} \boldx_i$ are count vectors for the training data with smoothing parameter $\alpha = 0.5$. We do not use a smoothing parameter (prior) for the class distribution.
+\subsection{Trigram Model}
 
-Additionally, we also experiment with non-binarized feature vectors, where each feature can be understood to follow a catergorical distribution over counts having a Dirichlet prior.
+\subsection{Neural Network Language Model}
 
-\subsection{Logistic Regression}
-The logistic regression model involved takes in a vector representation of a sentence $\boldx$, applies a linear function with weights $\boldw$ and bias $b$, and uses a sigmoid transformation to return the probability of that sentence having positive sentiment $p$.  That is,
+
+\subsection{Long Short-Term Memory Recurrent Neural Network Model}
+The Long Short-Term Memory Recurrent Neural Network Model (LSTM) was proposed as a way to cleanly integrate long-term memory into a recurrent neural network.  Traditionally, regular recurrent neural nets have suffered from an inability to propagate information from past iterations of training, because they get inundated with more recent information.  The LSTM has four interacting layers, as depicted below.  This helps with deciding what information to propagate or forget from earlier in sentences.  The key idea is that there is a cell state $\boldC_t$ that may or may not be modified significantly by operations applied to the hidden state propagated hidden state $\boldh_t$ and the current word $\boldx_t$. 
+
+\begin{figure}[H]
+\begin{center}
+\includegraphics[scale=0.5]{lstm}
+\caption{An unrolled diagram of a single-layer LSTM.}
+\end{center} 
+\end{figure}
+
+\noindent
+The mathematical layering of a single-layer LSTM follows:
 \begin{align*}
-p = \sigma(\boldw \cdot \boldx + b)
+\boldf_t &= \sigma(\boldW_f \cdot [\boldh_{t-1}, \boldx_t] + b_f) \\
+\boldi_t &= \sigma(\boldW_i \cdot [\boldh_{t-1}, \boldx_t] + b_i) \\
+\tilde{\boldC}_t &= \tanh(\boldW_C \cdot [\boldh_{t-1}, \boldx_t]  + b_C) \\
+\boldC_t &= \boldf_t * \boldC_{t-1} + \boldi_t * \tilde{\boldC} \\
+\boldo_t &= \sigma(\boldW_o \cdot [\boldh_{t-1}, \boldx_t]  + b_o) \\
+\boldh_t &= \boldo_t * \tanh(\boldC_t)
 \end{align*}
-The form of $\boldx$ we choose here is simply a binary vector with size $\lvert \mcV \rvert$ that has a value of 1 if the associated word appears in the sentence and has a value of 0 otherwise.
+where $*$ denotes the element-wise multiplication operator. 
 
-We train the weights and bias using the Adam optimizer, which converges to lower losses more quickly than stochastic gradient descent.  Our chosen learning rate is 0.01.  Using training batches of size 100, we optimize the loss function as the negative log-likelihood of the parameters $L(\boldw, b)$.  For this model, we primarily experiment with varying a regularization penalty $\lambda$ applied to the weights $\boldw$, which changes the overall loss function to 
+For the construction of the overall model to predict the distribution over the next word $\boldx_{t+1}$, we follow the architecture as described by Zaremba et. al in their "large regularized LSTM".  We first encode each word as an embedding $\boldx_t$ of size $d \times 1$.  Then, we pass $\boldx_t$ through a 2-layer LSTM with $l =1500$ hidden units to get an output $\boldo_t$.  For regularization, we then apply dropout with a rate of 0.65 to $\boldo_t$.  Next, we apply a linear transformation to $\boldo_t$ and pass the result through a softmax function to obtain a probability distribution $\boldq_t$ over the next word:
 \begin{align*}
-L(\boldw, b) + \lambda \| \boldw \|_2
-\end{align*}
+\boldq_t = \text{softmax} (W \boldo_t + b)
+\end{align*} 
+where $W$ is a $\lvert \mathcal{V} \rvert \times l$ matrix and $b$ is a $\lvert \mathcal{V} \rvert \times 1$ vector.  This $\boldq_t$ is then used to calculate the average loss.  We adjust weights to reduce the average loss using different optimizers such as stochastic gradient descent and Adam.  For final comparisons between models of this type, we report perplexity on the test set.           
 
-\subsection{Continuous Bag-of-Words}
-For this model, we utilize pre-trained word embeddings of length 300 generated using the skip-gram word2vec model, which have been shown to yield better results than the CBOW word2vec embeddings. After embedding all words in each sentence, we pool the embeddings per sentence by taking the sum, and then apply a simple logistic regression model for classification. 
 
-As in the previous section, we train the weights and bias of the model using the Adam optimizer and adopt the learning rate 0.01. We optimize the same loss function described previously.
-
-\subsection{Convolutional Neural Network}
-For the convolutional neural network, we first utilize the classic \texttt{word2vec} transformation to convert between words in sentences and their continuous vector representations.  For each word in a sentence, we have a 300-by-1 vector.  Then, we apply three sets of convolutions with kernel sizes of $h = 3, 4, 5$ and 100 out-channels each.  The resultant values for each kernel size and out-channel are first put through a rectified linear activation function and then pooled over time.  Thus, each original sentence becomes mapped to a 300-feature vector.  This vector is then passed through an affine transformation with weights $\boldw$ and bias $b$, giving us a single value that we pass through a sigmoid activation to generate $p$, the probability of the original sentence having positive sentiment.  
-
-In the spirit of Kim's paper, we also utilize regularization techniques.  First, we use dropout with probability $0.5$ in the final layer to mitigate co-adaptation of convolutional weight vectors.  Next, we also restrict all weights to have a 2-norm of at most 3.  This prevents large weights and overfitting.  In our experiments, we mainly vary across different optimizers (Adam, SGD, Adadelta), different regularization parameters, and adding in different convolutions.  
-
-\subsection{Multivariate Naive Bayes + Convolutional Neural Network}
-
-This model is simply an aggregation of Multivariate Naive Bayes and the Convolutional Neural Network.  Noting that both models give us discriminative probability distributions $p(y \vert \boldx)$ over the sentiment of a sentence, we thought of the following natural way to combine the two predictions: For a given sentence, if the two models agree on a classification, then we simply output that consensus.  If they differ, then we choose the model that is "more sure" of its answer; in other words, we output the proposed class of the model who has a higher probability estimate $p(y \vert \boldx)$.  We hoped that this aggregation of the two models could improve the overall accuracy.   
 \section{Experiments}
 
-We performed several experiments to tune the hyper-parameters of our models.  Perhaps surprisingly, Multivariate Naive Bayes seemed to perform the best on this dataset.  In-depth explanations of our tuning procedure and associated results can be found in this section.  Note that all accuracies are test set accuracies, which were different from the validation set accuracies used to adjust the hyper-parameters of the model.  
+We performed several experiments to tune the hyper-parameters of our models.  In general, the LSTM seemed to perform the best.  In-depth explanations of our tuning procedure and associated results can be found in this section.  Note that all perplexities are test set perplexities. 
 
 \begin{table}[H]
 \centering
@@ -64,83 +71,62 @@ We performed several experiments to tune the hyper-parameters of our models.  Pe
  \toprule
  Model &  & Acc. \\
  \midrule
- \textsc{Baseline (Single Class)} & & 0.538\\
- \textsc{Multivariate Naive Bayes (Binary)} & & 0.822 \\
- \textsc{Multivariate Naive Bayes} & & 0.751 \\
- \textsc{Logistic Regression} & & 0.797 \\
- \textsc{Continuous Bag-of-Words} & & \\
- \textsc{Convolutional Neural Network} & & 0.802 \\
- \textsc{Multivariate Naive Bayes + Convolutional Neural Network}  & & 0.805 \\
+ \textsc{Trigram Model} & &  \\
+ \textsc{Neural Network Language Model} & &  \\
+ \textsc{Long Short-Term Memory RNN} & & 139.98 \\
  \bottomrule 
 \end{tabular}
-\caption{\label{tab:results} Classification accuracies of our models.}
+\caption{\label{tab:results} Language perplexities of our models.}
 \end{table}
 
-\subsection{Multivariate Naive Bayes} 
-Firstly, we experimented with non-binarized features for MNB. In this setting, the feature vectors were bag-of-words counts over each sentence, with symmetric Dirichlet priors over the possible feature count space $[0, 10]$. After tuning the smoothing parameter to $\alpha = 0.5$ using grid search on the validation set, we achieved a best test set accuracy of 0.751. 
+\subsection{Trigram Model} 
 
-We conducted a similar tuning process over the validation set for $\alpha$ in the case of binarized features, and achieved a best test set accuracy of 0.822 when $\alpha = 0.5$. The superior performance of binarized MNB compared to standard MNB is unsurprising given the literature.
+\subsection{Neural Network Language Model}
+
+\subsection{Long Short-Term Memory RNN}
+One item we varied in the LSTM RNN was the number of hidden states for the LSTM.  Specifically, we looked at differences between the "medium-size" LSTM (650 states) and the "large-size" LSTM (1500 states) proposed by Zaremba et. al.  We found that the large-size LSTM took longer to train, but obtained a significantly lower perplexity.  However, the difference is large enough, so we decided to stick with large LSTM.  Here are our best results on both models.
 
 \begin{center}
 	\begin{tabular}{ c | c c c c c}
-		$\alpha$ & $1$ & $0.5$ & $0.1$ & $0.01$ \\
+		 & Medium LSTM & Large LSTM  \\
 		\hline
-		Valid Set Acc. & 0.629 & 0.791 & 0.768 & 0.764 
+		Test Set Perplexity & 160.12 & 139.98 
 	\end{tabular}
-\end{center}
+\end{center} 
 
-\subsection{Logistic Regression}
-
-As specified earlier, we primarily tuned the regularization parameters $\lambda$.  We tried values of $\lambda = 10^{-2}, 10^{-3}, 10^{-4}, 10^{-5}, 10^{-6}$.  Here are the corresponding accuracies on the validation set.
+The second variable that we took into account was the optimization method.  We looked at both SGD and Adam.  We also varied the \emph{starting} learning rate (STR) for these two methods.  During training, we followed the results in the paper and decreased the learning rate by a factor of 1.2 for each iteration.  Here are our best result under various settings.     
 
 \begin{center}
-\begin{tabular}{ c | c c c c c}
-$\lambda$ & $10^{-2}$ & $10^{-3}$ & $10^{-4}$ & $10^{-5}$ & $10^{-6}$ \\
-\hline
-Valid Set Acc. & 0.704 & 0.771 & 0.797 & 0.798 & 0.792 
-\end{tabular}
-\end{center}
-The differences are not too significant, but we settle on a regularization parameter of $\lambda = 10^{-5}$ from this experiment.  
-
-\subsection{Continuous Bag-of-Words}
-Using the summed CBOW word embeddings as the inputs to the logistic regression model, we perform a similar hyper-parameter tuning procedure as before; we pool the train and validation sets generated by Torchtext's data loader and use 5-fold cross-validation to select a learning rate. After finding that CBOW + logistic regression did not yield very good results, we additionally explored the use of deeper models with 2 hidden layers, but did not obtain good results.
-
-\subsection{Convolutional Neural Network}
-
-For the convolutional neural network, we varies our optimizer, our regularization parameters, and the convolution structure.  For the optimizer, we had choices between Adam, Stochastic Gradient Descent, and Adadelta.  We saw that Adadelta and Adam generally converged faster than stochastic gradient descent.  For the basic model outlined in [4] and described in Section 3.4, we found that Adam's training after 20 iterations led to a higher accuracy than Adadelta.  Here are the accuracies on the validation set after 20 iterations for the three different optimization methods.  
+	\begin{tabular}{ c | c c c c c}
+		 & SGD (STR = 1) & SGD (STR = 0.1) & SGD (STR = 0.01)  \\
+		\hline
+		Test Set Perplexity & 203.27 & 156.35 & 183.24 
+	\end{tabular}
+\end{center} 
 
 \begin{center}
-\begin{tabular}{ c | c c c c c}
-Optimization Method & Adam & Adadelta & SGD \\
-\hline
-Valid Set Acc. & 0.803 & 0.792 & 0.775
-\end{tabular}
-\end{center}
+	\begin{tabular}{ c | c c c c c}
+		 & Adam (STR = 0.01) & Adam (STR = 0.001)  \\
+		\hline
+		Test Set Perplexity & 152.12 & 139.98 
+	\end{tabular}
+\end{center} 
+From this, we chose to use the Adam optimizer with a starting learning rate of $10^{-3}$.  
 
-Next, we also looked at varying the regularization parameter $s$, which restricted the maximum 2-norm of the weight vectors.  The results were not too interesting.  Making $s$ larger than 3 resulted in higher training accuracies, yet lower validation accuracies.  Making $s$ smaller than 3 led to decreases in both.  
-
-Finally, we also looked into varying the convolutional structure.  We added in 100 convolutions for sliding window of $h = 2$ and (separately) 100 convolutions for sliding window of $h = 6$.  Neither of these raised the overall validation accuracy. 
+The last variable we looked at was varying the word embedding dimension $d$.  Surprisingly, this had quite a significant effect on the efficacy of the LSTM RNN.  Here are our best results. 
 
 \begin{center}
-\begin{tabular}{ c | c c c c c}
-Convolution Structure & $h = 3, 4, 5$ & $h = 2, 3, 4, 5$ & $h = 3, 4, 5, 6$ \\
-\hline
-Valid Set Acc. & 0.803 & 0.778 & 0.801
-\end{tabular}
-\end{center}
+	\begin{tabular}{ c | c c c c c}
+		 & $d = 100$ & $d = 300$ & $d = 500$ &  $d = 1000$  \\
+		\hline
+		Test Set Perplexity & 189.21 & 151.20 & 143.44  & 139.98 
+	\end{tabular}
+\end{center}    
 
-In addition, we considered the dynamic convolutional neural net described in [4], in which the word embeddings are updated during training as well.  However, none of our experiments with the dynamic convolution increases the validation set accuracy past 0.803, which was achieved using the static convolutional neural net. 
-   
-
-\subsection{Multivariate Naive Bayes + Convolutional Neural Network}
-
-In the combined Multivariate Naive Bayes and Convolutional Neural Network model, we actually saw a decrease in performance when compared to the original Naive Bayes model.  Taking the best Multivariate Naive Bayes model from Section 4.1 and the best Convolutional Neural Network model from Section 4.4 did not actually lead to a better overall model.  We suspect that this is because the Convolutional Neural Net typically predicts high probabilities and it overrode the Naive Bayes's decisions incorrectly in certain cases.  The overall validation set accuracy for this combined model was 0.809.
-
+Thus, we decide to use an embedding size of 1000.
 
 \section{Conclusion}
-Using the Stanford Sentiment Treebank dataset, we have evaluated the performance of four standard sentiment classification models and one additional ``hybrid'' model, and have found that the simplest model, Multivariate Naive Bayes, performs the best. These results strongly illustrate the superior performance of MNB on short snippets. With the findings of [5] in mind, we envision that the application of bigrams to the MNB model has the potential to further improve classification accuracy.
 
-Perhaps the most important takeaway of this exercise is that overly complex models may perform significantly more poorly in practice than the simplest idea.  
 
 
 \bibliography{writeup}
