@@ -11,19 +11,16 @@ class LinearInterpTrigram(nn.Module):
         super(LinearInterpTrigram, self).__init__()
         self.V = V
 
-        self.unigrams = nn.Embedding(V, 1)
-        self.bigrams  = nn.Embedding(V, V)
-        self.trigrams = nn.Embedding(V * V, V)
-        self.init_counts()
+        self.unigrams = self.init_counts(V, 1)
+        self.bigrams  = self.init_counts(V, V)
+        self.trigrams = dict()
 
         self.w = nn.Linear(4, 1, bias=False)
 
-    def init_counts(self):
-        for counts in (self.unigrams, self.bigrams, self.trigrams):
-            counts.weight.data = torch.zeros(counts.weight.data.size())
-
-    def get_trigram_idx(self, pair):
-        return torch.Tensor([pair[0] * self.V + pair[1]]).long()
+    def init_counts(self, *size):
+        counts = nn.Embedding(*size)
+        counts.weight.data = torch.zeros(counts.weight.data.size())
+        return counts
 
     def batch_to_ngrams(self, batch, n, trim=True):
         '''
@@ -50,11 +47,10 @@ class LinearInterpTrigram(nn.Module):
 
             trigrams, trigram_targets = self.batch_to_ngrams(words, 3, trim=True)
             ones = torch.zeros(batch_size-2, self.V).scatter_(1, trigram_targets, 1)
-            trigrams = torch.stack([
-                self.get_trigram_idx(pair) for pair in
-                torch.unbind(trigrams, dim=0)
-            ], dim=0).squeeze()
-            self.trigrams.weight.data.index_add_(0, trigrams, ones)
+            for (pair, target) in zip(trigrams, trigram_targets):
+                tmp = self.trigrams.get(pair, self.init_counts(self.V, 1))
+                tmp.weight.data[target] += 1
+                self.trigrams[pair] = tmp
 
         elif self.eval or estimate_weights:
             # compute predictions
@@ -62,14 +58,12 @@ class LinearInterpTrigram(nn.Module):
             n_predictions = len(trigrams)
 
             bigram_indices = Variable(trigrams[:, 1], requires_grad=False)
-            trigram_indices = Variable(torch.stack([
-                self.get_trigram_idx(pair) for pair in
-                torch.unbind(trigrams, dim=0)
-            ], dim=0).squeeze(), requires_grad=False)
-
             zero_back = self.unigrams.weight.data
             one_back = self.bigrams(bigram_indices).data
-            two_back = self.trigrams(trigram_indices).data
+            two_back = torch.stack([
+                self.trigrams.get(pair, self.init_counts(self.V, 1)).weight.data
+                for pair in torch.unbind(trigrams, dim=0)
+            ], dim=0).squeeze()
 
             p = Variable(torch.zeros(n_predictions, self.V, 4), requires_grad=False)
             p[:, :, 0] = 1 / self.V

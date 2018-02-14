@@ -84,15 +84,23 @@ def train(model, train_loader, val_loader, TEXT, criterion, optimizer, args):
             total_loss = 0
             start_time = time.time()
 
-def get_counts(train_loader, model):
-    # Get counts
+def get_counts(train_loader, model, args):
+    start_time = time.time()
+
     for i, batch in enumerate(train_loader):
         data = batch.text.transpose(0, 1).contiguous().view(-1)
         model(data)
 
+        if i % args.log_interval == 0 and i > 0:
+            elapsed = time.time() - start_time
+            print('| {:5d}/{:5d} batches | ms/batch {:5.2f} | '.format(
+                i, len(train_loader), elapsed * 1000 / args.log_interval))
+            start_time = time.time()
+
+
 def main():
     parser = argparse.ArgumentParser(description='PyTorch PTB Trigram Model w/ Linear Interpolation')
-    parser.add_argument('--lr', type=float, default=1e-1,
+    parser.add_argument('--lr', type=float, default=1e-3,
                         help='initial learning rate')
     parser.add_argument('--epochs', type=int, default=40,
                         help='upper epoch limit')
@@ -104,7 +112,7 @@ def main():
                         help='random seed')
     parser.add_argument('--cuda', action='store_true',
                         help='use CUDA')
-    parser.add_argument('--log-interval', type=int, default=50, metavar='N',
+    parser.add_argument('--log-interval', type=int, default=200, metavar='N',
                         help='report interval')
     parser.add_argument('--save', type=str,  default='model.pt',
                         help='path to save the final model')
@@ -144,7 +152,13 @@ def main():
     best_val_loss = None
 
     try:
-        get_counts(train_iter, model)
+        count_start_time = time.time()
+        get_counts(train_iter, model, args)
+        print('-' * 89)
+        print('| End of counting | time: {:5.2f}s'.format(
+            (time.time() - count_start_time)))
+        print('-' * 89)
+
         for epoch in range(1, args.epochs+1):
             epoch_start_time = time.time()
             train(model, train_iter, val_iter, TEXT, criterion, optimizer, args)
@@ -152,7 +166,7 @@ def main():
 
             # Log results
             print('-' * 89)
-            print('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} | '
+            print('| End of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} | '
                     'valid ppl {:8.2f}'.format(
                         epoch, (time.time() - epoch_start_time),
                         val_loss, math.exp(val_loss)))

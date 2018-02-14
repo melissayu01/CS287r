@@ -23,7 +23,7 @@ def load_PTB(dev, use_pretrained_embeddings, batch_size, bptt_len,
         (train, val, test), bptt_len=bptt_len, batch_size=batch_size,
         shuffle=shuffle, repeat=repeat, device=-1)
 
-    TEXT.build_vocab(train, max_size=100 if dev else None)
+    TEXT.build_vocab(train, max_size=1000 if dev else None)
     if use_pretrained_embeddings:
         TEXT.vocab.load_vectors(vectors=GloVe(name='6B'))
         # url = 'https://s3-us-west-1.amazonaws.com/fasttext-vectors/wiki.simple.vec'
