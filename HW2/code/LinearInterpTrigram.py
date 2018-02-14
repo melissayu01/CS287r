@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -8,74 +9,75 @@ torch.set_printoptions(precision=4)
 class LinearInterpTrigram(nn.Module):
     def __init__(self, V):
         super(LinearInterpTrigram, self).__init__()
+        self.V = V
 
-        self.unigrams = nn.Parameter(torch.zeros(V).int())
-        self.bigrams  = nn.Parameter(torch.zeros(V, V).int())
-        self.trigrams = nn.Parameter(torch.zeros(V, V, V).int())
+        self.unigrams = nn.Embedding(V, 1)
+        self.bigrams  = nn.Embedding(V, V)
+        self.trigrams = nn.Embedding(V * V, V)
+        self.init_counts()
 
         self.w = nn.Linear(4, 1, bias=False)
 
-    def discrete_context_freq(self, context):
-        '''
-        bins context frequency; used to estimate weights.
-        [currently unused]
-        '''
-        x = self.trigram[context[0], context[1]].sum().data
-        T = self.unigram.sum().data
-        return int( math.ceil(-math.log((1 + x[0]) / T[0])) )
+    def init_counts(self):
+        for counts in (self.unigrams, self.bigrams, self.trigrams):
+            counts.weight.data = torch.zeros(counts.weight.data.size())
 
-    def batch_to_ngrams(self, batch, n):
+    def get_trigram_idx(self, pair):
+        return torch.Tensor([pair[0] * self.V + pair[1]]).long()
+
+    def batch_to_ngrams(self, batch, n, trim=True):
         '''
         NOTE: returns 1 extra ngram than target -- the last ngram
         has no corresponding target in this batch.
         '''
-        batch = batch.data
         ngrams, targets = batch.unfold(0, n-1, 1), batch[n-1:]
-        for _ in range(n-1):
-            targets.unsqueeze_(-1)
-        return ngrams.long(), targets.long()
+        if trim:
+            ngrams = ngrams[:-1]
+        return ngrams.long().squeeze(), targets.long().unsqueeze_(-1)
 
     def forward(self, batch, estimate_weights=False):
         batch_size = len(batch)
+        words = batch.data
+
         if self.training and not estimate_weights:
             # update counts
-            ones = torch.ones(batch_size)
-            self.unigrams.index_add_(0, batch, ones)
+            ones = torch.ones(batch_size, 1)
+            self.unigrams.weight.data.index_add_(0, words, ones)
 
-            bigrams, bigram_targets = self.batch_to_ngrams(batch, 2)
-            bigrams = bigrams[:-1]
-            ones = torch.zeros(len(bigrams), self.V).scatter_(1, bigram_targets, 1)
-            self.bigrams.index_add_(0, bigrams, ones)
+            bigrams, bigram_targets = self.batch_to_ngrams(words, 2, trim=True)
+            ones = torch.zeros(batch_size-1, self.V).scatter_(1, bigram_targets, 1)
+            self.bigrams.weight.data.index_add_(0, bigrams, ones)
 
-            trigrams, trigram_targets = self.batch_to_ngrams(batch, 3)
-            trigrams = trigrams[:-1]
-            ones = torch.zeros(len(trigrams), self.V).scatter_(1, trigram_targets, 1)
-            for i, context in enumerate(trigrams.tolist()):
-                self.trigrams[context[0], context[1]].add_(ones[i])
+            trigrams, trigram_targets = self.batch_to_ngrams(words, 3, trim=True)
+            ones = torch.zeros(batch_size-2, self.V).scatter_(1, trigram_targets, 1)
+            trigrams = torch.stack([
+                self.get_trigram_idx(pair) for pair in
+                torch.unbind(trigrams, dim=0)
+            ], dim=0).squeeze()
+            self.trigrams.weight.data.index_add_(0, trigrams, ones)
 
-        else:
+        elif self.eval or estimate_weights:
             # compute predictions
-            trigrams, trigram_targets = self.batch_to_ngrams(batch, 3)
+            trigrams, trigram_targets = self.batch_to_ngrams(words, 3, trim=estimate_weights)
+            n_predictions = len(trigrams)
 
-            q = torch.zeros(len(trigrams)).int()
-            for i, context in enumerate(trigrams.tolist()):
-                q[i] = self.discrete_context_freq(context)
+            bigram_indices = Variable(trigrams[:, 1], requires_grad=False)
+            trigram_indices = Variable(torch.stack([
+                self.get_trigram_idx(pair) for pair in
+                torch.unbind(trigrams, dim=0)
+            ], dim=0).squeeze(), requires_grad=False)
 
-            zero_back = self.unigrams
-            one_back = self.bigrams.index_select(0, trigrams[:, 1])
-            two_back = self.trigrams.index_select(0, trigrams[:, 0]).index_select(0, trigrams[:, 1])
+            zero_back = self.unigrams.weight.data
+            one_back = self.bigrams(bigram_indices).data
+            two_back = self.trigrams(trigram_indices).data
 
-            if estimate_weights:
-                p = torch.zeros(len(trigram_targets), 4)
-                p[:, 0] = 1 / self.V
-                p[:, 1] = zero_back.index_select(0, trigram_targets) / zero_back.sum()
-                p[:, 2] = one_back.index_select(0, trigram_targets) / one_back.sum()
-                p[:, 3] = two_back.index_select(0, trigram_targets) / two_back.sum()
-            else:
-                p = torch.zeros(len(trigram_targets)+1, self.V, 4)
-                p[:, :, 0] = 1 / self.V
-                p[:, :, 1] = zero_back / zero_back.sum()
-                p[:, :, 2] = one_back / one_back.sum()
-                p[:, :, 3] = two_back / two_back.sum()
+            p = Variable(torch.zeros(n_predictions, self.V, 4), requires_grad=False)
+            p[:, :, 0] = 1 / self.V
+            for i in range(n_predictions):
+                p[i, :, 1] = zero_back / zero_back.sum()
+            p[:, :, 2] = one_back / one_back.sum()
+            p[:, :, 3] = two_back / two_back.sum()
 
-            return self.w(p).squeeze()
+            targets = Variable(trigram_targets, requires_grad=False)
+
+            return self.w(p).squeeze(), targets.squeeze()

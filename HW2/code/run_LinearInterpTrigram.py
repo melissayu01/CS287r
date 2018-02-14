@@ -25,7 +25,7 @@ def make_predictions(model, TEXT, ngram, criterion, pred_file):
     with open(PREDS_DIR+pred_file, "w") as fout:
         print("id,word", file=fout)
         for i, data in enumerate(test, start=1):
-            output = model(data)
+            output, targets = model(data)
 
             _, indices = torch.topk(output[-1], k=20)
             predictions = [TEXT.vocab.itos[i] for i in indices.data.tolist()]
@@ -46,13 +46,13 @@ def evaluate(model, data_loader, TEXT, criterion, args):
     for i, batch in enumerate(data_loader):
         data = batch.text.transpose(0, 1).contiguous().view(-1)
 
-        output = model(data)
-        total_loss += criterion(output, targets).data
+        output, targets = model(data)
+        total_loss += criterion(output[:-1], targets).data
         ntokens += targets.ne(padding_idx).int().sum().data
 
     return total_loss[0] / ntokens[0]
 
-def train(model, train_loader, val_loader, TEXT, criterion, args):
+def train(model, train_loader, val_loader, TEXT, criterion, optimizer, args):
     model.train()
 
     padding_idx = TEXT.vocab.stoi["<pad>"]
@@ -60,16 +60,15 @@ def train(model, train_loader, val_loader, TEXT, criterion, args):
     total_loss = 0
     start_time = time.time()
 
-    for i, batch in enumerate(train_loader):
-        data = batch.text.transpose(0, 1).contiguous().view(-1)
-        model(data)
-
+    # get weights from val set
     for i, batch in enumerate(val_loader):
         data = batch.text.transpose(0, 1).contiguous().view(-1)
-        model(data)
 
+        model.zero_grad()
+        output, targets = model(data, estimate_weights=True)
         loss = criterion(output, targets)
         loss.backward()
+        optimizer.step()
 
         ntokens += targets.ne(padding_idx).int().sum().data
         total_loss += loss.data
@@ -79,18 +78,34 @@ def train(model, train_loader, val_loader, TEXT, criterion, args):
             elapsed = time.time() - start_time
             print('| {:5d}/{:5d} batches | lr {:02.4f} | ms/batch {:5.2f} | '
                     'loss {:5.2f} | ppl {:8.2f}'.format(
-                        i, len(data_loader), args.lr, elapsed * 1000 / args.log_interval,
+                        i, len(val_loader), args.lr, elapsed * 1000 / args.log_interval,
                         cur_loss, math.exp(cur_loss)))
             ntokens = 0
             total_loss = 0
             start_time = time.time()
 
+def get_counts(train_loader, model):
+    # Get counts
+    for i, batch in enumerate(train_loader):
+        data = batch.text.transpose(0, 1).contiguous().view(-1)
+        model(data)
+
 def main():
-    parser = argparse.ArgumentParser(description='PyTorch PTB NN Language Model')
+    parser = argparse.ArgumentParser(description='PyTorch PTB Trigram Model w/ Linear Interpolation')
+    parser.add_argument('--lr', type=float, default=1e-1,
+                        help='initial learning rate')
+    parser.add_argument('--epochs', type=int, default=40,
+                        help='upper epoch limit')
+    parser.add_argument('--batch_size', type=int, default=20, metavar='N',
+                        help='batch size')
+    parser.add_argument('--bptt_len', type=int, default=32,
+                        help='sequence length')
     parser.add_argument('--seed', type=int, default=1111,
                         help='random seed')
     parser.add_argument('--cuda', action='store_true',
                         help='use CUDA')
+    parser.add_argument('--log-interval', type=int, default=50, metavar='N',
+                        help='report interval')
     parser.add_argument('--save', type=str,  default='model.pt',
                         help='path to save the final model')
     parser.add_argument('--kaggle', type=str,  default='',
@@ -109,7 +124,7 @@ def main():
 
     # Load data
     train_iter, val_iter, test_iter, TEXT = utils.load_PTB(
-        dev=args.dev, use_pretrained_embeddings=args.use_pretrained_em,
+        dev=args.dev, use_pretrained_embeddings=False,
         batch_size=args.batch_size, bptt_len=args.bptt_len)
 
     # Intialize model, loss.
@@ -118,16 +133,45 @@ def main():
         model.cuda()
     criterion = torch.nn.CrossEntropyLoss(
         size_average=False, ignore_index=TEXT.vocab.stoi["<pad>"])
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, 'min', factor=0.5, patience=0, threshold=5e-3)
 
-    # Train
     print('=' * 89)
-    train(model, train_iter, val_iter, TEXT, criterion, args)
-    val_loss = evaluate(model, val_iter, TEXT, criterion, args)
 
-    # TODO: learn weights...
+    # Train counts + weights.
+    lr = args.lr
+    best_val_loss = None
 
-    # Save model
-    torch.save(model, MODELS_DIR+args.save)
+    try:
+        get_counts(train_iter, model)
+        for epoch in range(1, args.epochs+1):
+            epoch_start_time = time.time()
+            train(model, train_iter, val_iter, TEXT, criterion, optimizer, args)
+            val_loss = evaluate(model, val_iter, TEXT, criterion, args)
+
+            # Log results
+            print('-' * 89)
+            print('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} | '
+                    'valid ppl {:8.2f}'.format(
+                        epoch, (time.time() - epoch_start_time),
+                        val_loss, math.exp(val_loss)))
+            print('-' * 89)
+
+            # Save the model if the validation loss is the best we've seen so far.
+            if not best_val_loss or val_loss < best_val_loss:
+                torch.save(model, MODELS_DIR+args.save)
+                best_val_loss = val_loss
+
+            # Anneal the learning rate if no improvement has been seen in the validation dataset.
+            scheduler.step(val_loss)
+    except KeyboardInterrupt:
+        print('-' * 89)
+        print('Exiting from training early')
+
+    # Load the best saved model.
+    with open(MODELS_DIR+args.save, 'rb') as f:
+        model = torch.load(f)
 
     # Run on test data.
     test_loss = evaluate(model, test_iter, TEXT, criterion, args)
