@@ -72,17 +72,17 @@ class LinearInterpTrigram(nn.Module):
 
         for i in range(batch_size):
             fragment = batch[i].data
-            if i == 0:
-                print(' '.join([TEXT.vocab.itos[j] for j in fragment]))
+            # if i == 0:
+            #     print(' '.join([TEXT.vocab.itos[j] for j in fragment]))
             for n in range(self.n):
                 ngrams = self.batch_to_ngrams(fragment, n, trim=False)
-                if i==0 and n==1:
-                    print(' '.join([TEXT.vocab.itos[j] for j in ngrams[0]]))
-                    print(' '.join([TEXT.vocab.itos[j] for j in ngrams[1]]))
+                # if i==0 and n==1:
+                #     print(' '.join([TEXT.vocab.itos[j] for j in ngrams[0]]))
+                #     print(' '.join([TEXT.vocab.itos[j] for j in ngrams[1]]))
                 for j, (context, target) in enumerate(zip(*ngrams)):
                     key = tuple(context) if n > 1 else context
                     c = self.counts[n].get(key, self.init_counts(n, normalize=True))
-                    print(key, self.alpha[n], c)
+                    # print(key, self.alpha[n], c)
                     if j < n_preds:
                         outputs[i, j] += self.alpha[n] * c
                     if j < n_preds - 1:

@@ -71,8 +71,6 @@ def train(epoch, model, data_loader, TEXT, criterion, optimizer, args):
 
     for i, batch in enumerate(data_loader):
         vec = batch.text.transpose(0, 1).contiguous().view(-1)
-        if i == 0:
-            print(' '.join([TEXT.vocab.itos[i] for i in vec.data.tolist()]))
         data, targets = vec.unfold(0, n-1, 1)[:-1], vec[n-1:]
 
         model.zero_grad()
@@ -107,17 +105,17 @@ def main():
                         help='size of word embeddings')
     parser.add_argument('--nhid', type=int, default=200,
                         help='number of hidden units per layer')
-    # parser.add_argument('--nlayers', type=int, default=2,
-    #                     help='number of layers')
-    parser.add_argument('--lr', type=float, default=1e-3,
-                        help='initial learning rate')
     parser.add_argument('--em_maxnorm', type=float, default=5,
                         help='max norm for learned embeddings')
     parser.add_argument('--clip', type=float, default=0.25,
                         help='gradient clipping')
+    # parser.add_argument('--nlayers', type=int, default=2,
+    #                     help='number of layers')
+    parser.add_argument('--lr', type=float, default=1e-3,
+                        help='initial learning rate')
     parser.add_argument('--epochs', type=int, default=10,
                         help='upper epoch limit')
-    parser.add_argument('--batch_size', type=int, default=10, metavar='N',
+    parser.add_argument('--batch_size', type=int, default=20, metavar='N',
                         help='batch size')
     parser.add_argument('--bptt_len', type=int, default=32,
                         help='sequence length')

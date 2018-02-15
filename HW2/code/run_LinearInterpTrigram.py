@@ -47,7 +47,6 @@ def evaluate(model, data_loader, TEXT, criterion, args):
     start_time = time.time()
 
     for i, batch in enumerate(data_loader):
-        print(i)
         if i > 0: break
         data = batch.text.transpose(0, 1).contiguous()
 
