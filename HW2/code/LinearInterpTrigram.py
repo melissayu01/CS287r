@@ -1,4 +1,5 @@
 import numpy as np
+import math
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -7,71 +8,84 @@ torch.set_printoptions(precision=4)
 
 
 class LinearInterpTrigram(nn.Module):
-    def __init__(self, V):
+    def __init__(self, V, n=3, alpha=[0.3, 0.5, 0.2]):
         super(LinearInterpTrigram, self).__init__()
-        self.V = V
+        self.V = V # vocabulary size
+        self.n = n # max n-gram size
 
-        self.unigrams = self.init_counts(V, 1)
-        self.bigrams  = self.init_counts(V, V)
-        self.trigrams = dict()
+        assert(n == len(alpha))
+        self.is_normalized = False
+        self.counts = [dict() for _ in range(n)] # counts keyed by tuples of word indices
+        self.alpha = alpha                       # weights for n-gram probabilities
 
-        self.w = nn.Linear(4, 1, bias=False)
-
-    def init_counts(self, *size):
-        counts = nn.Embedding(*size)
-        counts.weight.data = torch.zeros(counts.weight.data.size())
+    def init_counts(self, n, normalize=False):
+        init = 1 / self.V if normalize else (0 if n > 0 else 1)
+        counts = init * torch.ones(self.V)
         return counts
+
+    def normalize_counts(self):
+        for n in range(self.n):
+            for context in self.counts[n]:
+                self.counts[n][context] /= self.counts[n][context].sum()
+        self.is_normalized = True
 
     def batch_to_ngrams(self, batch, n, trim=True):
         '''
-        NOTE: returns 1 extra ngram than target -- the last ngram
-        has no corresponding target in this batch.
+        takes in vector (batch)
+        when trim=False, returns 1 extra ngram than target --
+        the last ngram has no corresponding target in this batch.
         '''
-        ngrams, targets = batch.unfold(0, n-1, 1), batch[n-1:]
+        assert(0 <= n < self.n)
+        if n == 0:
+            return [()] * len(batch), batch.tolist()
+        ngrams, targets = batch.unfold(0, n, 1), batch[n:]
         if trim:
             ngrams = ngrams[:-1]
-        return ngrams.long().squeeze(), targets.long().unsqueeze_(-1)
+        return ngrams.long().squeeze().tolist(), targets.long().tolist()
 
-    def forward(self, batch, estimate_weights=False):
+    def get_counts(self, batch, TEXT):
         batch_size = len(batch)
-        words = batch.data
 
-        if self.training and not estimate_weights:
-            # update counts
-            ones = torch.ones(batch_size, 1)
-            self.unigrams.weight.data.index_add_(0, words, ones)
+        for i in range(batch_size):
+            fragment = batch[i].data
+            # if i == 0:
+            #     print(' '.join([TEXT.vocab.itos[j] for j in fragment]))
+            for n in range(self.n):
+                contexts, targets = self.batch_to_ngrams(fragment, n, trim=True)
+                # if i==0 and n==1:
+                #     print(' '.join([TEXT.vocab.itos[j] for j in contexts]))
+                #     print(' '.join([TEXT.vocab.itos[j] for j in targets]))
+                for (context, target) in zip(contexts, targets):
+                    key = tuple(context) if n > 1 else context
+                    c = self.counts[n].get(key, self.init_counts(n, normalize=False))
+                    c[target] += 1
+                    self.counts[n][key] = c
 
-            bigrams, bigram_targets = self.batch_to_ngrams(words, 2, trim=True)
-            ones = torch.zeros(batch_size-1, self.V).scatter_(1, bigram_targets, 1)
-            self.bigrams.weight.data.index_add_(0, bigrams, ones)
+    def forward(self, batch, TEXT):
+        if not self.is_normalized:
+            self.normalize_counts()
 
-            trigrams, trigram_targets = self.batch_to_ngrams(words, 3, trim=True)
-            ones = torch.zeros(batch_size-2, self.V).scatter_(1, trigram_targets, 1)
-            for (pair, target) in zip(trigrams, trigram_targets):
-                tmp = self.trigrams.get(pair, self.init_counts(self.V, 1))
-                tmp.weight.data[target] += 1
-                self.trigrams[pair] = tmp
+        batch_size, bptt_len = batch.size()
+        n_preds = bptt_len - (self.n - 1) + 1
+        outputs = torch.zeros(batch_size, n_preds, self.V).float()
+        targets = torch.zeros(batch_size, n_preds-1).long()
 
-        elif self.eval or estimate_weights:
-            # compute predictions
-            trigrams, trigram_targets = self.batch_to_ngrams(words, 3, trim=estimate_weights)
-            n_predictions = len(trigrams)
+        for i in range(batch_size):
+            fragment = batch[i].data
+            if i == 0:
+                print(' '.join([TEXT.vocab.itos[j] for j in fragment]))
+            for n in range(self.n):
+                ngrams = self.batch_to_ngrams(fragment, n, trim=False)
+                if i==0 and n==1:
+                    print(' '.join([TEXT.vocab.itos[j] for j in ngrams[0]]))
+                    print(' '.join([TEXT.vocab.itos[j] for j in ngrams[1]]))
+                for j, (context, target) in enumerate(zip(*ngrams)):
+                    key = tuple(context) if n > 1 else context
+                    c = self.counts[n].get(key, self.init_counts(n, normalize=True))
+                    print(key, self.alpha[n], c)
+                    if j < n_preds:
+                        outputs[i, j] += self.alpha[n] * c
+                    if j < n_preds - 1:
+                        targets[i, j] = target
 
-            bigram_indices = Variable(trigrams[:, 1], requires_grad=False)
-            zero_back = self.unigrams.weight.data
-            one_back = self.bigrams(bigram_indices).data
-            two_back = torch.stack([
-                self.trigrams.get(pair, self.init_counts(self.V, 1)).weight.data
-                for pair in torch.unbind(trigrams, dim=0)
-            ], dim=0).squeeze()
-
-            p = Variable(torch.zeros(n_predictions, self.V, 4), requires_grad=False)
-            p[:, :, 0] = 1 / self.V
-            for i in range(n_predictions):
-                p[i, :, 1] = zero_back / zero_back.sum()
-            p[:, :, 2] = one_back / one_back.sum()
-            p[:, :, 3] = two_back / two_back.sum()
-
-            targets = Variable(trigram_targets, requires_grad=False)
-
-            return self.w(p).squeeze(), targets.squeeze()
+        return Variable(outputs), Variable(targets)

@@ -14,7 +14,7 @@ PREDS_DIR = '../predictions/'
 MODELS_DIR = '../models/'
 
 
-def make_predictions(model, TEXT, ngram, criterion, pred_file):
+def make_predictions(model, TEXT, criterion, pred_file):
     model.eval()
     test = utils.load_kaggle(TEXT)
 
@@ -25,13 +25,15 @@ def make_predictions(model, TEXT, ngram, criterion, pred_file):
     with open(PREDS_DIR+pred_file, "w") as fout:
         print("id,word", file=fout)
         for i, data in enumerate(test, start=1):
-            output, targets = model(data)
+            output, targets = model(data.view(1, -1), TEXT)
 
-            _, indices = torch.topk(output[-1], k=20)
+            _, indices = torch.topk(output.squeeze()[-1], k=20)
             predictions = [TEXT.vocab.itos[i] for i in indices.data.tolist()]
             print("%d,%s"%(i, " ".join(predictions)), file=fout)
 
-            total_loss += criterion(output[:-1], targets).data
+            output = output[:, :-1, :].contiguous().view(-1, len(TEXT.vocab))
+            targets = targets.view(-1)
+            total_loss += criterion(output, targets).data
             ntokens += targets.ne(padding_idx).int().sum().data
 
     return total_loss[0] / ntokens[0]
@@ -42,69 +44,41 @@ def evaluate(model, data_loader, TEXT, criterion, args):
     padding_idx = TEXT.vocab.stoi["<pad>"]
     ntokens = 0
     total_loss = 0
+    start_time = time.time()
 
     for i, batch in enumerate(data_loader):
-        data = batch.text.transpose(0, 1).contiguous().view(-1)
+        print(i)
+        if i > 0: break
+        data = batch.text.transpose(0, 1).contiguous()
 
-        output, targets = model(data)
-        total_loss += criterion(output[:-1], targets).data
+        output, targets = model(data, TEXT)
+        output = output[:, :-1, :].contiguous().view(-1, len(TEXT.vocab))
+        targets = targets.view(-1)
+        total_loss += criterion(output, targets).data
         ntokens += targets.ne(padding_idx).int().sum().data
 
     return total_loss[0] / ntokens[0]
 
-def train(model, train_loader, val_loader, TEXT, criterion, optimizer, args):
+def train(model, data_loader, TEXT, criterion, args):
     model.train()
 
-    padding_idx = TEXT.vocab.stoi["<pad>"]
-    ntokens = 0
-    total_loss = 0
     start_time = time.time()
 
     # get weights from val set
-    for i, batch in enumerate(val_loader):
-        data = batch.text.transpose(0, 1).contiguous().view(-1)
-
-        model.zero_grad()
-        output, targets = model(data, estimate_weights=True)
-        loss = criterion(output, targets)
-        loss.backward()
-        optimizer.step()
-
-        ntokens += targets.ne(padding_idx).int().sum().data
-        total_loss += loss.data
-
-        if i % args.log_interval == 0 and i > 0:
-            cur_loss = total_loss[0] / ntokens[0]
-            elapsed = time.time() - start_time
-            print('| {:5d}/{:5d} batches | lr {:02.4f} | ms/batch {:5.2f} | '
-                    'loss {:5.2f} | ppl {:8.2f}'.format(
-                        i, len(val_loader), args.lr, elapsed * 1000 / args.log_interval,
-                        cur_loss, math.exp(cur_loss)))
-            ntokens = 0
-            total_loss = 0
-            start_time = time.time()
-
-def get_counts(train_loader, model, args):
-    start_time = time.time()
-
-    for i, batch in enumerate(train_loader):
-        data = batch.text.transpose(0, 1).contiguous().view(-1)
-        model(data)
+    for i, batch in enumerate(data_loader):
+        data = batch.text.transpose(0, 1).contiguous()
+        model.get_counts(data, TEXT)
 
         if i % args.log_interval == 0 and i > 0:
             elapsed = time.time() - start_time
-            print('| {:5d}/{:5d} batches | ms/batch {:5.2f} | '.format(
-                i, len(train_loader), elapsed * 1000 / args.log_interval))
+            print('| {:5d}/{:5d} batches | ms/batch {:5.2f}'.format(
+                i, len(data_loader), elapsed * 1000 / args.log_interval))
             start_time = time.time()
 
 
 def main():
     parser = argparse.ArgumentParser(description='PyTorch PTB Trigram Model w/ Linear Interpolation')
-    parser.add_argument('--lr', type=float, default=1e-3,
-                        help='initial learning rate')
-    parser.add_argument('--epochs', type=int, default=40,
-                        help='upper epoch limit')
-    parser.add_argument('--batch_size', type=int, default=20, metavar='N',
+    parser.add_argument('--batch_size', type=int, default=10, metavar='N',
                         help='batch size')
     parser.add_argument('--bptt_len', type=int, default=32,
                         help='sequence length')
@@ -141,51 +115,30 @@ def main():
         model.cuda()
     criterion = torch.nn.CrossEntropyLoss(
         size_average=False, ignore_index=TEXT.vocab.stoi["<pad>"])
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, 'min', factor=0.5, patience=0, threshold=5e-3)
-
     print('=' * 89)
 
-    # Train counts + weights.
-    lr = args.lr
-    best_val_loss = None
-
+    # Get counts.
     try:
         count_start_time = time.time()
-        get_counts(train_iter, model, args)
+        train(model, train_iter, TEXT, criterion, args)
+        val_loss = evaluate(model, val_iter, TEXT, criterion, args)
+
+        # Log results
         print('-' * 89)
-        print('| End of counting | time: {:5.2f}s'.format(
-            (time.time() - count_start_time)))
+        print('| End of counting | time: {:5.2f}s | valid loss {:5.2f} | '
+                'valid ppl {:8.2f}'.format(
+                    (time.time() - count_start_time),
+                    val_loss, math.exp(val_loss)))
         print('-' * 89)
 
-        for epoch in range(1, args.epochs+1):
-            epoch_start_time = time.time()
-            train(model, train_iter, val_iter, TEXT, criterion, optimizer, args)
-            val_loss = evaluate(model, val_iter, TEXT, criterion, args)
-
-            # Log results
-            print('-' * 89)
-            print('| End of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} | '
-                    'valid ppl {:8.2f}'.format(
-                        epoch, (time.time() - epoch_start_time),
-                        val_loss, math.exp(val_loss)))
-            print('-' * 89)
-
-            # Save the model if the validation loss is the best we've seen so far.
-            if not best_val_loss or val_loss < best_val_loss:
-                torch.save(model, MODELS_DIR+args.save)
-                best_val_loss = val_loss
-
-            # Anneal the learning rate if no improvement has been seen in the validation dataset.
-            scheduler.step(val_loss)
+        # Save the model.
+        torch.save(model, MODELS_DIR+args.save)
     except KeyboardInterrupt:
         print('-' * 89)
         print('Exiting from training early')
 
     # Load the best saved model.
-    with open(MODELS_DIR+args.save, 'rb') as f:
-        model = torch.load(f)
+    model = torch.load(MODELS_DIR+args.save)
 
     # Run on test data.
     test_loss = evaluate(model, test_iter, TEXT, criterion, args)
@@ -198,7 +151,7 @@ def main():
 
     # Make Kaggle predictions.
     if args.kaggle:
-        pred_loss = make_predictions(model, TEXT, args.ngram, criterion, args.kaggle)
+        pred_loss = make_predictions(model, TEXT, criterion, args.kaggle)
         print('=' * 89)
         print('| End of predicting | kaggle loss {:5.2f} | kaggle ppl {:8.2f}'.format(
             pred_loss, math.exp(pred_loss)))
