@@ -129,7 +129,7 @@ class Seq2Seq(nn.Module):
     def forward(self, src, trg):
         enc_output, enc_hidden = self.encoder(src)
 
-        if True or self.training:
+        if True or src.size(0) == trg.size(0):
             dec_output, dec_hidden, context_or_attn = self.decoder(
                 trg, enc_hidden, enc_output)
         else:

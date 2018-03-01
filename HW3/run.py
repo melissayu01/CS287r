@@ -117,16 +117,17 @@ def evaluate(model, data_loader, criterion, use_cuda):
     vocab_size = model.decoder.V
     total_loss = 0
 
-    for i, batch in enumerate(data_loader):
-        src, trg_input, trg_targets = utils.get_src_and_trgs(
-            batch, use_cuda, is_eval=True
-        )
+    with torch.no_grad():
+        for i, batch in enumerate(data_loader):
+            src, trg_input, trg_targets = utils.get_src_and_trgs(
+                batch, use_cuda, is_eval=True
+            )
 
-        output, context_or_attn = model(src, trg_input)
+            output, context_or_attn = model(src, trg_input)
 
-        loss = criterion(output.view(-1, vocab_size),
-                         trg_targets.contiguous().view(-1))
-        total_loss += loss.data[0]
+            loss = criterion(output.view(-1, vocab_size),
+                             trg_targets.contiguous().view(-1))
+            total_loss += loss.data[0]
 
     return total_loss / len(data_loader)
 
@@ -158,8 +159,8 @@ def train(epoch, model, data_loader, criterion, optimizer, use_cuda, args, SRC, 
 
         # record loss and attention for batch
         total_loss += loss.data[0]
-        if args.attention:
-            attns.append(context_or_attn)
+        # if args.attention and args.sample:
+        #     attns.append(context_or_attn)
 
         if i % args.log_interval == 0 and i > 0:
             pred = torch.topk(output.data, k=1, dim=2)[1]
@@ -181,6 +182,9 @@ def train(epoch, model, data_loader, criterion, optimizer, use_cuda, args, SRC, 
                       cur_loss, math.exp(cur_loss)))
             total_loss = 0
             start_time = time.time()
+
+        # free some memory
+        del output, context_or_attn, loss
 
     return attns
 

@@ -27,7 +27,7 @@ def load_dataset_from_fields(DE, EN):
     )
     return train, val, test
 
-def load_dataset(batch_size, use_pretrained_emb, save_dir):
+def load_dataset(batch_size, use_pretrained_emb=False, save_dir='.save'):
     '''
     Each batch has dimensions (seq_len, batch_size)
     Returns tuple of (train iterator, val iterator, test iterator, TRG, SRC).
@@ -37,8 +37,7 @@ def load_dataset(batch_size, use_pretrained_emb, save_dir):
     fname = './{}/vocabs.jl'.format(save_dir)
     try:
         data_dict = joblib.load(fname)
-        if ((MAX_LEN != data_dict['MAX_LEN']) or
-            (MIN_FREQ != data_dict['MIN_FREQ'])):
+        if ((MAX_LEN != data_dict['max_len']) or (MIN_FREQ != data_dict['min_freq'])):
             raise ValueError()
 
         print('Using cached vocabs...')

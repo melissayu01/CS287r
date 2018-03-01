@@ -18,14 +18,14 @@ if USE_CUDA:
 def main():
     # Load data
     print('Loading data...')
-    train_iter, val_iter, DE, EN = load_data(max_len=20, min_freq=5, batch_size=32)
+    train_iter, val_iter, test_iter, DE, EN = load_dataset(batch_size=32)
     PAD_IDX = EN.vocab.stoi[EN.pad_token]
 
     # Build model and optimizer
     print('Building model and optimizer...')
-    s2s = Seq2Seq(enc_vocab_size=len(DE.vocab), dec_vocab_size=len(EN.vocab), 
-                  enc_embed_dim=1500, dec_embed_dim=1500, hidden_size=1500, 
-                  enc_num_layers=2, dec_num_layers=2, padding_idx=PAD_IDX, 
+    s2s = Seq2Seq(enc_vocab_size=len(DE.vocab), dec_vocab_size=len(EN.vocab),
+                  enc_embed_dim=1500, dec_embed_dim=1500, hidden_size=1500,
+                  enc_num_layers=2, dec_num_layers=2, padding_idx=PAD_IDX,
                   dropout_rate=0.2)
     if USE_CUDA:
         s2s = s2s.cuda()
@@ -75,7 +75,7 @@ def train(model, data, loss_func, optimizer, pad_idx, max_grad_norm):
         # Reverse order of input
         src = batch.src[range(batch.src.size(0)-1, -1, -1)]
         # src = batch.src
-        
+
         trg_input = batch.trg[:-1]
         trg_output = batch.trg[1:]
         n_not_pad = (trg_output.data != pad_idx).int().sum()
@@ -110,7 +110,7 @@ def eval(model, data, loss_func, pad_idx):
         # Reverse order of input
         src = batch.src[range(batch.src.size(0)-1, -1, -1)]
         # src = batch.src
-        
+
         trg_input = batch.trg[:-1]
         trg_output = batch.trg[1:]
         n_not_pad = (trg_output.data != pad_idx).int().sum()
@@ -119,12 +119,12 @@ def eval(model, data, loss_func, pad_idx):
             src = src.cuda()
             trg_input = trg_input.cuda()
             trg_output = trg_output.cuda()
-        
+
         log_probs = model(src, trg_input)
         if USE_CUDA:
             log_probs = log_probs.cuda()
         loss = loss_func(log_probs.view(-1, model.dec_vocab_size), trg_output.view(-1))
-        total_loss += loss.data   
+        total_loss += loss.data
     avg_loss = total_loss / total_n
     model.train()
     return avg_loss
