@@ -120,10 +120,8 @@ def seq_to_text(seq, TEXT):
 def sample(num_samples, src, trg, pred, SRC, TRG):
     '''
     Sample src, trg, and pred sentences.
+    all inputs are Tensors
     '''
-    src = src.data
-    trg = trg.data
-    pred = pred.data
     for i in range(num_samples):
         print('>>>>> SAMPLE {}'.format(i))
         print('[SRC] {}'.format(' '.join(seq_to_text(src[i], SRC))))

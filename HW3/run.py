@@ -163,16 +163,16 @@ def train(epoch, model, data_loader, criterion, optimizer, use_cuda, args, SRC, 
         #     attns.append(context_or_attn)
 
         if i % args.log_interval == 0 and i > 0:
-            pred = torch.topk(output.data, k=1, dim=2)[1]
+            pred = torch.topk(output, k=1, dim=2)[1].squeeze().cpu()
             if args.sample:
-                utils.sample(1, src, trg_targets, pred, SRC, TRG)
-                if args.attention:
-                    fname = './{}/{}.png'.format(VIS_DIR, args.save)
-                    j = 0
-                    sample_attn = attns[-1][j].squeeze().data.numpy()
-                    sample_src = utils.seq_to_text(src[j].squeeze().data, SRC)
-                    sample_pred = utils.seq_to_text(pred[j].squeeze(), TRG)
-                    utils.visualize_attn(sample_attn, sample_src, sample_pred, fname)
+                utils.sample(1, src.data, trg_targets.data, pred.data, SRC, TRG)
+                # if args.attention:
+                #     fname = './{}/{}.png'.format(VIS_DIR, args.save)
+                #     j = 0
+                #     sample_attn = attns[-1][j].squeeze().data.numpy()
+                #     sample_src = utils.seq_to_text(src[j].squeeze().data, SRC)
+                #     sample_pred = utils.seq_to_text(pred[j].squeeze(), TRG)
+                #     utils.visualize_attn(sample_attn, sample_src, sample_pred, fname)
             cur_loss = total_loss / args.log_interval
             elapsed = time.time() - start_time
             print('| epoch {:3d} | {:5d}/{:5d} batches | lr {:02.4f} '
