@@ -117,17 +117,16 @@ def evaluate(model, data_loader, criterion, use_cuda):
     vocab_size = model.decoder.V
     total_loss = 0
 
-    with torch.no_grad():
-        for i, batch in enumerate(data_loader):
-            src, trg_input, trg_targets = utils.get_src_and_trgs(
-                batch, use_cuda, is_eval=True
-            )
+    for i, batch in enumerate(data_loader):
+        src, trg_input, trg_targets = utils.get_src_and_trgs(
+            batch, use_cuda, is_eval=True
+        )
 
-            output, context_or_attn = model(src, trg_input)
+        output, context_or_attn = model(src, trg_input)
 
-            loss = criterion(output.view(-1, vocab_size),
-                             trg_targets.contiguous().view(-1))
-            total_loss += loss.data[0]
+        loss = criterion(output.view(-1, vocab_size),
+                         trg_targets.contiguous().view(-1))
+        total_loss += loss.data[0]
 
     return total_loss / len(data_loader)
 
