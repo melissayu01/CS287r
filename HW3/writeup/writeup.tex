@@ -147,7 +147,7 @@ And here are our results for deciding whether or not to reverse the input senten
 To generate predictions for the Kaggle competition, we used beam search with a beam of 100.  Our Kaggle score obtained from the baseline sequence-to-sequence model trained with the most optimal parameters is 0.24806.   
 
 \subsection{Sequence-to-Sequence with Attention} 
-We train the attenton model using full teacher forctthe am optimizer with learning rate 0.001, decaying the rate by 0.5 each epoch after 8 epochs. The choice of optimizer was important, leading to a drop in validation perplexity from 12.83 to 7.55, all else held constant. All gradients are clipped to a maximum total norm of 10. We train for a maximum of 30 epochs, using the validation set perplexity as criteria for early stopping. 
+We train the attention model using full teacher forcing and additionally mask the source at words that are padded. We use the Adam optimizer with learning rate 0.001, decaying the rate by 0.5 each epoch after 8 epochs. The choice of optimizer was important, leading to a drop in validation perplexity from 12.83 to 7.55, all else held constant. All gradients are clipped to a maximum total norm of 10. We train for a maximum of 30 epochs, using the validation set perplexity as criteria for early stopping. 
 
 We experimented with initializing the embeddings matrices with pretrained vectors (e.g., GloVe, fastText), but found that this did not give a significant performance improvement. Likewise, limiting the max norm for embedding values did not lead to performance gains.
 
@@ -168,9 +168,6 @@ Figure \ref{fig:attn} shows sample attention plots for our final model.
 	\end{center} 
 \end{figure}
 
-
-\section{Conclusion}
-In this practical, we implemented two models to predict the most likely translations: A baseline LSTM sequence-to-sequence model and a version of this model with dot product attention. We also implemented a beam search algorithm to make predictions using our models. Our experiments on the German-English dataset show that the model with attention performs quite well, achieving a Kaggle public BLEU score of 0.27141 and a validation set perplexity of 7.55.
 
 \section{Conclusion}
 In this practical, we implemented two models to predict the most likely translations: A baseline LSTM sequence-to-sequence model and a version of this model with dot product attention. We also implemented a beam search algorithm to make predictions using our models. Our experiments on the German-English dataset show that the both the baseline model and the model with attention perform quite well, scoring well above the Kaggle baseline.
