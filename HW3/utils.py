@@ -87,17 +87,6 @@ def load_dataset(batch_size, use_pretrained_emb=False, save_dir='.save'):
 
     return train_iter, val_iter, test_iter, DE, EN
 
-def load_kaggle(TEXT):
-    print('Loading Kaggle data...')
-
-    out = []
-    for line in open('source_test.txt'):
-        words = line.split()[:-1]
-        out.append([TEXT.vocab.stoi[word] for word in words])
-
-    print("[PRED]:{} (dataset:{})".format(len(out), len(out)))
-    return out
-
 def get_src_and_trgs(batch, use_cuda, is_eval):
     '''
     Returns tuple of Variables representing
@@ -128,7 +117,7 @@ def sample(num_samples, src, trg, pred, SRC, TRG):
         print('[TRG] {}'.format(' '.join(seq_to_text(trg[i], TRG))))
         print('[PRED] {}'.format(' '.join(seq_to_text(pred[i], TRG))))
 
-def visualize_attn(attn, src, trg, fname):
+def visualize_attn(attn, src, pred, trg, fname):
     # Set up figure with colorbar
     fig = plt.figure()
     ax = fig.add_subplot(111)
@@ -136,8 +125,9 @@ def visualize_attn(attn, src, trg, fname):
     fig.colorbar(cax)
 
     # Set up axes
+    pred_and_trgs = ['[{}] {}'.format(t, p) for p, t in zip(pred, trg)]
     ax.set_xticklabels([''] + src, rotation=90)
-    ax.set_yticklabels([''] + trg)
+    ax.set_yticklabels([''] + pred_and_trgs)
 
     # Show label at every tick
     ax.xaxis.set_major_locator(ticker.MultipleLocator(1))
