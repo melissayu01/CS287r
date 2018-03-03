@@ -12,9 +12,11 @@ import models
 
 torch.set_printoptions(precision=4)
 
+
 SAVE_DIR = '.save'
 VIS_DIR = 'vis'
 PREDS_DIR = 'preds'
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description='PyTorch DE-EN NMT')
@@ -76,41 +78,6 @@ def parse_args():
     return parser.parse_args()
 
 
-def make_predictions(model, criterion, TRG, SRC, args):
-    model.eval()
-
-    test = utils.load_kaggle(SRC)
-    vocab_size = model.decoder.V
-    total_loss = 0
-    fname = './{}/{}.txt'.format(PREDS_DIR, args.save)
-
-    with open(fname, "w") as fout:
-        print("id,word", file=fout)
-        for i, batch in enumerate(test, start=1):
-            src, trg_input, trg_targets = utils.get_src_and_trgs(
-                batch, args.cuda, is_eval=True
-            )
-
-            output, context_or_attn = model(src, trg_input)
-
-            loss = criterion(output.view(-1, vocab_size),
-                             trg_targets.contiguous().view(-1))
-            total_loss += loss.data[0]
-
-            # _, indices = torch.topk(output[-1], k=20)
-            # predictions = [TRG.vocab.itos[i] for i in indices.data.tolist()]
-            # print("%d,%s"%(i, " ".join(predictions)), file=fout)
-
-            # criterion.step(dec_output, trg_targets)
-            pass
-
-    pred_loss = total_loss / len(test)
-    print('=' * 89)
-    print('| End of predicting | kaggle loss {:5.2f} | kaggle ppl {:8.2f}'
-          .format(pred_loss, math.exp(pred_loss)))
-    print('=' * 89)
-
-
 def evaluate(model, data_loader, criterion, use_cuda):
     model.eval()
 
@@ -156,22 +123,12 @@ def train(epoch, model, data_loader, criterion, optimizer, use_cuda, args, SRC, 
             nn.utils.clip_grad_norm(model.parameters(), max_norm=args.clip)
         optimizer.step()
 
-        # record loss and attention for batch
         total_loss += loss.data[0]
-        # if args.attention and args.sample:
-        #     attns.append(context_or_attn)
 
         if i % args.log_interval == 0 and i > 0:
             pred = torch.topk(output, k=1, dim=2)[1].squeeze().cpu()
             if args.sample:
                 utils.sample(1, src.data, trg_targets.data, pred.data, SRC, TRG)
-                # if args.attention:
-                #     fname = './{}/{}.png'.format(VIS_DIR, args.save)
-                #     j = 0
-                #     sample_attn = attns[-1][j].squeeze().data.numpy()
-                #     sample_src = utils.seq_to_text(src[j].squeeze().data, SRC)
-                #     sample_pred = utils.seq_to_text(pred[j].squeeze(), TRG)
-                #     utils.visualize_attn(sample_attn, sample_src, sample_pred, fname)
             cur_loss = total_loss / args.log_interval
             elapsed = time.time() - start_time
             print('| epoch {:3d} | {:5d}/{:5d} batches | lr {:02.4f} '
@@ -246,7 +203,7 @@ def main():
         hidden_size=args.hidden_size,
         num_layers=args.num_layers,
         dropout=args.dropout,
-        bidirectional=args.bidirectional
+        bidirectional=False # args.bidirectional
     )
     model = models.Seq2Seq(enc, dec, use_cuda=use_cuda)
     if use_cuda:
@@ -319,8 +276,6 @@ def main():
         test_loss, math.exp(test_loss)))
     print('=' * 89)
 
-    # Make Kaggle predictions.
-    make_predictions(model, criterion, TRG, SRC, args)
 
 if __name__ == '__main__':
     main()
