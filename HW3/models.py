@@ -120,10 +120,10 @@ class AttnDecoderRNN(DecoderRNN):
         output, hidden = self.lstm(embedded, hidden)
 
         # (batch_size, in_len, decoder_size)
-        enc_output_linear = self.context_to_decoder(enc_output)
+        enc_to_dec = self.context_to_decoder(enc_output)
 
         # (batch_size, out_len, in_len)
-        attn = torch.bmm(output, enc_output_linear.transpose(1, 2))
+        attn = torch.bmm(output, enc_to_dec.transpose(1, 2))
 
         batch_size, in_len = attn.size(0), attn.size(2)
         if mask is not None:
