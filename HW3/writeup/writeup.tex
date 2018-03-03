@@ -3,7 +3,8 @@
 \usepackage{natbib}
 \usepackage{amssymb}
 \usepackage{common}
-
+\usepackage{graphicx}
+\graphicspath{ {../img/} }
 
 \title{HW3: Translation}
 \author{Alex Lin \\ alexanderlin01@college.harvard.edu \and Melissa Yu \\ melissayu@college.harvard.edu \and Team Name: \textsc{Pudge}}
@@ -52,7 +53,23 @@ $$n_\text{hid} = \dim s_t = \dim h_t$$
 is the number of hidden states in each of the two LSTMs.
 
 \subsection{Sequence-to-Sequence with Attention}
-           
+Next, we incorporate attention into the baseline model. We once again experiment with vanilla and bidirectional LSTM's for both the encoder and decoder networks.
+
+The encoder network consists of an embedding layer, $M^{(e)}\in\mathbb{R}^{m_e\times\lvert \mathcal{V}_s \rvert}$, followed by an $N^{(e)}$-layer LSTM with hidden size $H^{(e)}$. The encoder returns the hidden and cell states $(h_S, c_S)\in \mathbb{R}^{N^{(e)}\times H^{(e)}}$ for the last word in the input, along with the the outputs $o_s\in \mathbb{R}^{H^(e)}$ at the last LSTM layer for all words in the input.
+
+The decoder network also consists of an embedding layer, $M^{(d)}\in\mathbb{R}^{m_d\times\lvert \mathcal{V}_t \rvert}$, followed by an $N^{(d)}$-layer LSTM with hidden size $H^{(d)}$. The LSTM hidden and cell states $(h_0, c_0)\in \mathbb{R}^{N^{(d)}\times H^{(d)}}$ are initialized using the last "forward" direction encoder hidden and cell states $(h_S, c_S)$. We let $o_t\in \mathbb{R}^{H^(d)}$ be the output of the LSTM. We compute the dot product attention over the inputs for each timestep $t$ by taking
+\[
+\alpha_t = \mathcal{S}(f(o_{1:S}, o_t)),
+\]
+where $f = (\boldW o_{1:S} + b)\cdot o_t$; the linear layer $(\boldW, b)$ over the encoder output is necessary to transform its hidden size to match that of the decoder. Using the attention weights, we construct a context vector $c_t$:
+\[
+c_t = \sum_{s=1}^S \alpha_{ts} o_s
+\]
+Then, the probability distribution over our target vocabulary words returned by the decoder is
+\[
+p(y_t\given y_{<t}, \boldx) =
+\mathcal{S}(\boldW' [o_t, c_t]^\trans + b')
+\]    
 
 
 \section{Experiments}
@@ -66,7 +83,7 @@ We performed several experiments to tune the hyper-parameters of our models. The
  Model &  & Validation Perplexity & & Kaggle Score\\
  \midrule
  \textsc{Baseline Sequence-to-Sequence} & & 13.831 & &0.24806\\
- \textsc{Sequence-to-Sequence with Attention} & &  \\
+ \textsc{Sequence-to-Sequence with Attention} & &7.55&&0.27141  \\
  \bottomrule 
 \end{tabular}
 \caption{\label{tab:results} Language perplexities and Kaggle scores of our models.}
@@ -129,10 +146,34 @@ And here are our results for deciding whether or not to reverse the input senten
 
 To generate predictions for the Kaggle competition, we used beam search with a beam of 100.  Our Kaggle score obtained from the baseline sequence-to-sequence model trained with the most optimal parameters is 0.24806.   
 
-\subsection{Sequence-to-Sequence with Attention}
+\subsection{Sequence-to-Sequence with Attention} 
+We train the attenton model using full teacher forctthe am optimizer with learning rate 0.001, decaying the rate by 0.5 each epoch after 8 epochs. The choice of optimizer was important, leading to a drop in validation perplexity from 12.83 to 7.55, all else held constant. All gradients are clipped to a maximum total norm of 10. We train for a maximum of 30 epochs, using the validation set perplexity as criteria for early stopping. 
+
+We experimented with initializing the embeddings matrices with pretrained vectors (e.g., GloVe, fastText), but found that this did not give a significant performance improvement. Likewise, limiting the max norm for embedding values did not lead to performance gains.
+
+Our final model uses single-direction 2-layer LSTM's with a hidden size of 200 for both the encoder and decoder and a dropout of 0.3 during training. This model achieves a training set perplexity of 8.67 and a validation set perplexity of 7.55. Surprisingly, bidirectional LSTM's performed poorly on this task, overfitting to the training target data.
+
+Figure \ref{fig:attn} shows sample attention plots for our final model.
+
+\begin{figure}[H]
+	\begin{center}
+		\includegraphics[scale=0.5]{attn_0}
+		\includegraphics[scale=0.5]{attn_1}
+		\includegraphics[scale=0.5]{attn_2}
+		\includegraphics[scale=0.5]{attn_3}
+		\includegraphics[scale=0.5]{attn_4}
+		\includegraphics[scale=0.5]{attn_5}
+		\label{fig:attn}
+		\caption{Attention plots for a selection of sentences from the training dataset. The source (German) sentences are shown on the $x$ axis, and the targets are shown on the $y$ axis. The predicted target words are shown perpended with the true word in braces.}
+	\end{center} 
+\end{figure}
+
 
 \section{Conclusion}
+In this practical, we implemented two models to predict the most likely translations: A baseline LSTM sequence-to-sequence model and a version of this model with dot product attention. We also implemented a beam search algorithm to make predictions using our models. Our experiments on the German-English dataset show that the model with attention performs quite well, achieving a Kaggle public BLEU score of 0.27141 and a validation set perplexity of 7.55.
 
+\section{Conclusion}
+In this practical, we implemented two models to predict the most likely translations: A baseline LSTM sequence-to-sequence model and a version of this model with dot product attention. We also implemented a beam search algorithm to make predictions using our models. Our experiments on the German-English dataset show that the both the baseline model and the model with attention perform quite well, scoring well above the Kaggle baseline.
 
 
 \bibliography{writeup}
