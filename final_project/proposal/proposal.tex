@@ -1,0 +1,97 @@
+\documentclass[11pt, margin=1in]{article}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage[margin=1in]{geometry}
+\usepackage{fancyhdr}
+\usepackage{natbib}
+\usepackage{hyperref}
+
+\hypersetup{
+    colorlinks=true,
+    citecolor=blue,
+    urlcolor=red
+}
+
+% Use these for theorems, lemmas, proofs, etc.
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{claim}[theorem]{Claim}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{fact}[theorem]{Fact}
+\usepackage{tikz}
+\usetikzlibrary{arrows}
+\newenvironment{proof}{\noindent {\it Proof.}}{\hfill\rule{2mm}{2mm}}
+\pagestyle{fancy}
+\lhead{\textbf{CS236r Project Proposal}}
+\rhead{\textit{Alex Lin \& Melissa Yu}}
+\cfoot{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.4pt}
+\newcommand{\card}[1]{\ensuremath{\left\vert#1\right\vert}}
+\newcommand{\diff}[1]{\, d#1}
+\newcommand{\eval}[2]{\Big|_{#1}^{#2}}
+
+\makeatletter
+
+\begin{document}
+	
+\title{CS236r Project Proposal \\ Scoring Systems for Predicting Credit Risk}
+\author{Alex Lin \and Melissa Yu}
+\date{}
+\maketitle
+
+\section{Introduction}
+In this proposal, we apply the  Supersparse Linear Integer Model (SLIM) scoring system to make interpretable predictions of loan default risk. We motivate this research by describing how the proposed mechanism can develop an accurate model that is simultaneously easy to understand for the average layman.
+
+\section{Background}
+
+Consumer spending is among the most important determinants of macroeconomic conditions and systemic risk, accounting for around 70\% of the U.S. GDP between 2001 and 2010 \cite{ml-for-risk}. As the credit industry has rapidly expanded over the last few decades, the risk associated with consumer lending has multiplied as well. Today, it is more important than ever that financial institutions leverage accurate, interpretable prediction models and algorithms to make the many lending decisions they must process on a daily basis, instead of relying on potentially biased, inaccurate, and un-scalable human discretion. These predictive algorithms leverage characteristics pulled from the consumer credit files collected by credit bureau agencies to discern the riskiness of a loan.
+
+\subsection{Credit scoring models} 
+\textit{Credit scoring models} are quantitative models widely used by financial institutions to determine the probability of delinquency or default for loan applicants \cite{genetic-ong, nn-scoring-models}. These models have as their goal accurately classifying loan applicants into one of two groups: ``good'' customers, who are likely to repay their debt, and ``bad'' customers, who are denied credit on the basis that they are likely to default.
+
+In order for lenders to leverage scoring algorithms to make smart lending decisions, the model they use must satisfy several requirements \cite{fico-criteria}:
+\begin{enumerate}
+	\item \textbf{Predictive power}: The model should make accurate predictions of customer type -- good or bad.
+	\item \textbf{Fairness}: The model must comply with the Equal Credit Opportunity Act (ECOA) and Fair Credit Reporting Act (FCRA). It cannot discriminate on the basis of race, age, education, employment history, gender, marital status, or wealth.
+	\item \textbf{Broad coverage}: The model is adaptable enough to apply across large datasets of people.
+	\item \textbf{Data transparency}: The data used in the model is verifiable and correctable by consumers.
+	\item \textbf{Interpretability (consumer-focused)}: The model's classification process can be easily explained to and understood by consumers, and the most important predictive factors can be intuitively identified to aid loan seekers in improving their profile.
+\end{enumerate}
+
+\subsection{Scoring Systems}
+Scoring systems are linear classification models that only require users to add, subtract and multiply a few small numbers in order to make a prediction \cite{slim}.  This makes them remarkably easy to understand for the average layman, especially when compared to other machine learning models used for prediction.  When working in high-risk settings such as credit scoring, it is imperative that users feel that they can interpret the models that are available to them \cite{ml-social-problems}.  If they see an algorithm as nothing more than a black-box, then there is a good chance that they will inherently mistrust its capabilities.  
+
+This is exactly why scoring systems may be desirable for high-risk problems in domains such as medicine and law \cite{slim, risk-slim} in which the cost of a misclassification can have grave consequences.  Using classical optimization techniques in Mixed Integer Programming (MIP), Ustun and Rudin were able to develop an algorithm called the Supersparse Linear Integer Model (SLIM) that can generate generic scoring systems while taking into account factors such as algorithmic fairness and interpretable coefficients \cite{slim}.  Although SLIM produces simple models, its models also seem to exhibit high accuracy under AUC measures.  The authors further developed RiskSLIM, which can produce scoring systems that not only make a prediction, but can also incorporate risk assessment into that prediction \cite{risk-slim}.   
+
+\section{Research Proposal}
+The previously described attributes of the credit risk prediction problem motivate us to suggest a scoring system-based solution.  We will apply the work of Ustun and Rudin to the domain of finance and implement a SLIM-based algorithm that can produce a scoring system to determine if an individual will default on his/her loan.  In creating the scoring system, we will enforce constraints that are specific to our domain of study, such as fairness requirements as detailed under ECOA and FCRA.  We will assess the model's accuracy using AUC analysis and also examine the tradeoff between the algorithm's runtime and optimality gap.  
+
+Given enough time, we would also like to incorporate default risk into our model using principles from RiskSLIM.  
+  
+\subsection{Dataset and Implementation}
+There are many different datasets online for loan default prediction.  We have not settled on our dataset of choice yet, but we have examined a few possibilities:
+\begin{itemize}
+\item \url{https://www.kaggle.com/c/GiveMeSomeCredit}
+\item \url{https://www.kaggle.com/c/loan-default-prediction}
+\item \url{http://archive.ics.uci.edu/ml/datasets/Statlog+\%28German+Credit+Data\%29}
+\item \url{https://archive.ics.uci.edu/ml/datasets/default+of+credit+card+clients}
+\end{itemize}
+The key will involve selecting a dataset that covers a desirable feature space.  We plan to do our implementation of SLIM in Python and use a library such as \href{https://www.stat.washington.edu/~hoytak/code/pycpx/index.html}{PyCPX} to solve the MIPs.  
+
+\subsection{Immediate First Steps}
+There are two main avenues on which we will focus our initial efforts.  The first is \emph{model-based} and will require us to develop a deep intuition for Ustun and Rudin's papers \cite{slim, risk-slim}.  We will read these papers very closely and understand them to the point at which we would feel comfortable presenting them in a lecture.      
+
+The second is \emph{application-based} and will require us to compile a list of reasonable credit scoring-related constraints to encode into the SLIM algorithm.  For example, one such constraint could be ensuring that the scoring system does not discriminate based on race.
+
+\subsection{Support from the Teaching Staff} 
+It would be great if the teaching staff could help us choose a dataset that they feel would work well for this project.  Any papers related to fairness or interpretability in the financial domain, or any further work on scoring systems would also be greatly appreciated. 
+
+
+\bibliographystyle{abbrv}
+\bibliography{refs}
+
+\end{document}
