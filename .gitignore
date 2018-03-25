@@ -20,6 +20,10 @@ vis/
 # pytorch
 *.pt
 
+# other
+*.zip
+
+
 ## Bibliography auxiliary files (bibtex/biblatex/biber):
 *.bbl
 *.bcf
