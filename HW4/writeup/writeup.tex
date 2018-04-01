@@ -47,24 +47,27 @@ We train $G$ to maximize $\log(D(G(z))$ instead of minimizing $\log(1-D(G(z)))$ 
 
 The input to the generator is a noise vector, which is sampled from a spherical normal prior $p(\mathbf{z}) = \mathcal{N}(\mathbf{0}, \mathbf{I})$.
 
+Because the MNIST dataset also provided labels for the data, we additionally tried improving the model's generator by training the discriminator to also classify the samples. To do this, we implemented an auxillary GAN, which shared the first 2 layers of the generator's neural network, but whose output layer consisted of a linear layer and softmax activation. The results for this modified model appear similar to the original network, and are also shown below.
+
 \begin{figure}[H]
 	\begin{center}
 		\includegraphics[scale=0.5]{fake_images-200}
+		\includegraphics[scale=0.5]{fake_images-200-mod}
 		\label{fig:gan-vis}
-		\caption{Visualization of 100 generated samples from random noise vectors sampled from a spherical normal prior with dimension 64.}
+		\caption{Left: Visualization of 100 generated samples from random noise vectors sampled from a spherical normal prior with dimension 64. Right: 100 samples generated using the modified GAN with auxillary digit classification network.}
 	\end{center} 
 \end{figure}
 
 \begin{figure}[H]
 	\begin{center}
 		\includegraphics[scale=0.5]{interp_fake_images-1}
-		\includegraphics[scale=0.5]{interp_fake_images-2}
+		\includegraphics[scale=0.5]{interp_fake_images-2} \\
+		\includegraphics[scale=0.5]{interp_fake_images-1-mod}
+		\includegraphics[scale=0.5]{interp_fake_images-2-mod}
 		\label{fig:gan-vis}
-		\caption{Visualization of samples generated from interpolations of 2 random noise vectors sampled from a spherical normal prior with dimension 64.}
+		\caption{Top: Visualization of samples generated from interpolations of 2 random noise vectors sampled from a spherical normal prior with dimension 64. Bottom: Interpolated samples generated using GAN with auxiliary network.}
 	\end{center} 
 \end{figure}
-
-Because the MNIST dataset also provided labels for the data, we can additionally consider improving the model's generator by training the discriminator to also classify the samples. To do this, we would implement an auxillary GAN, which shares the first 2 layers of the generator's neural network, but whose output layer consists of a softmax activation. 
 
 \subsection{Variational Autoencoder} 
 
