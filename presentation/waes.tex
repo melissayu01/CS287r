@@ -125,6 +125,114 @@
 
 \section{Introduction} 
 
+\begin{frame}{Jensen-Shannon divergence}
+	Minimize Jensen-Shannon divergence between true data distribution $p_d$ and generative model $p_g$:
+	\[
+	\min_G \mathcal{D}_{JS}(p_d(x) \vert\vert p_g(x))
+	\]
+	
+	where
+	\[
+	\mathcal{D}_{JS}(p_d(x) \vert\vert p_g(x)) = 
+	\frac{1}{2} \mathcal{D}_{KL}(p_d \vert\vert \frac{p_d + p_g}{2}) +
+	\frac{1}{2} \mathcal{D}_{KL}(p_g \vert\vert \frac{p_d + p_g}{2})
+	\]
+\end{frame}
+
+\begin{frame}{Generative Adversarial Networks (GANs)}
+	Minimizing JSD corresponds to finding best $G$ when $D$ is optimal
+	\[
+	\min_G \max_D V(D, G) = \E_{p_d(x)} [\log D(x)] + \E_{p_z(z)} [\log (1 - D(G(z)))]
+	\]
+	
+	Min-max game between 2 neural networks
+	\begin{itemize}
+		\item generator $G(z)$: prior $p_z(z)$ and likelihood $p(x\given z)$
+		\item discriminator $D(x)$: predicts probability $x$ comes from $p_d$, not $p_g$
+	\end{itemize}
+\end{frame}
+
+\begin{frame}{VAEs}
+	Encoder $q(z\given x)$, decoder $p(x\given z)$. Prior on latent codes $p(z)$.
+	
+	\begin{align*}
+	\min_q \ & \E_{q(z\given x)} [-\log p(x\given z)] + \mathcal{D}_{KL}(q(z\given x) \ \vert\vert \ p(z)) \\
+	&= \text{Reconstruction} + \text{Regularization}
+	\end{align*}
+\end{frame}
+
+\begin{frame}{Adversarial Auto-encoders (AAEs)}
+	\begin{itemize}
+	\item Aggregated posterior
+\begin{equation*}
+q(z) = \int_{x} q(z\given x) p_d(x) dx
+\end{equation*}
+
+	\item Replaces VAE's $\mathcal{D}_{KL}(q(z\given x) \ \vert\vert \ p(z))$ regularizer with $\mathcal{D}_{JS}(q(z) \ \vert\vert \ p(z))$
+	\end{itemize}
+\end{frame}
+
+\begin{frame}{AAE: Adversarial Networks}
+	\begin{itemize}
+		\item Directly minimizing $\mathcal{D}_{JS}(p(z) \ \vert\vert \ q(z))$ is intractable
+		
+		\item $\Rightarrow$ Attach adversarial network on top of $z$
+		\begin{itemize}
+			\item Encoder of autoencoder is also generator of adversarial network 
+			\[G(z) = q(z\given x)\]
+			
+			\item Discriminator $D$ distinguishes $p(z)$ (positive samples) from $q(z)$ (negative samples)
+		\end{itemize}
+	\end{itemize}
+\end{frame}
+
+\begin{frame}{AAE}
+	\begin{center}
+		\includegraphics[width=0.9\linewidth]{AAE}
+	\end{center}
+\end{frame}
+
+\begin{frame}{AAE}
+	Trained by alternately minimizing reconstruction error and training adversarial network
+	\begin{enumerate}
+		\item \textit{Reconstruction phase.} 
+		Encoder $q$ and decoder $p$ are trained to minimize reconstruction error:
+		\begin{equation}
+		\min_{q, p} \ \E_{q(z\given x)} [-\log p(x\given z)]
+		\end{equation}
+		
+		\item \textit{Regularization phase.} 
+		Adversarial network is trained on GAN objective:
+		\begin{equation*}
+		\min_q \max_{D} \ \E_{p(z)} [\log D(z)] + \E_{q(z\given x)} [\log (1 - D(z))] 
+		\end{equation*}
+		
+	\end{enumerate}
+\end{frame}
+
+\begin{frame}{Choice of Encoder $q$}
+	\begin{itemize}
+		\item Deterministic: $q$ is deterministic function of $x$
+		\begin{itemize}
+			\item may not produce smooth mapping; empirical distribution of data is fixed by training set
+		\end{itemize}
+	
+		\item Gaussian posterior: $q$ is Gaussian distribution whose parameters are predicted by encoder network
+		\[
+		z \sim \mathcal{N}(\mu(x), \sigma(x))
+		\]
+		\item Universal approximator posterior
+	\end{itemize}
+\end{frame}
+
+\begin{frame}{Encoder (cont.)}
+	\begin{itemize}
+		\item Gaussian posterior + universal approximator posterior give network additional sources of stochasticity that could help it in the adversarial regularization stage by smoothing out $q(z)$.
+		
+		\item In practice, authors obtain similar test likelihoods for all 3 choices.
+	\end{itemize}
+\end{frame}
+
 \begin{frame}
 \frametitle{WAE Paper}
 \begin{center}
