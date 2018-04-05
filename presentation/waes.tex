@@ -210,6 +210,12 @@ q(z) = \int_{x} q(z\given x) p_d(x) dx
 	\end{enumerate}
 \end{frame}
 
+\begin{frame}{Semi-supervised AAE}
+	\begin{itemize}
+		\item \textit{Semi-supervised phase.} The encoder for $y$, $q(y\given x)$, is trained to minimize the cross entropy cost on labeled examples.
+	\end{itemize}
+\end{frame}
+
 \begin{frame}{Choice of Encoder $q$}
 	\begin{itemize}
 		\item Deterministic: $q$ is deterministic function of $x$
@@ -231,6 +237,12 @@ q(z) = \int_{x} q(z\given x) p_d(x) dx
 		
 		\item In practice, authors obtain similar test likelihoods for all 3 choices.
 	\end{itemize}
+\end{frame}
+
+\begin{frame}{AAE vs. VAE}
+	\begin{center}
+		\includegraphics[width=0.6\linewidth]{VAE_comp}
+	\end{center}
 \end{frame}
 
 \begin{frame}
