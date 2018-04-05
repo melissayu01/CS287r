@@ -42,8 +42,7 @@
 
 \usepackage{tikz}
 \usepackage{graphicx}
-\usepackage{smartdiagram}
-\usepackage{xcolor}
+\graphicspath{{./img/}}
 
 
 \mode<presentation> {
@@ -124,15 +123,219 @@
 \titlepage 
 \end{frame}
 
-\section{Motivation}
+\section{Introduction} 
+
+\begin{frame}
+\frametitle{WAE Paper}
+\begin{center}
+\includegraphics[scale=0.5]{wae-paper}
+\end{center}
+\end{frame}
+
 \begin{frame}
 \frametitle{A Quick Review of VAEs}
-Let our data be distributed according to $P_X$.  
+\begin{itemize}
+\item Let our data $x_1, \ldots, x_n \in \mathcal{X}$ be distributed according to $P_X$.
+\pause 
 
-\col{Variational Auto-Encoders} (VAEs) seek to find a generative model (i.e. decoder) $G$ that minimizes
+\item Goal of generative modeling is to find a model $G$ with $P_G : \mathcal{X} \to [0, 1]$ that minimizes a specified distance $D(P_X, P_G)$.  
+\pause
+
+\item \col{Variational Auto-Encoders} (VAEs) seek to minimize 
 \begin{align*}
-D_{KL}(P_X, P_G)
+D_{KL}(P_X, P_G) = \underbrace{-\E_{P_X}[\log P_G(X)]}_{\text{\col{negative log-likelihood}}} + \underbrace{\E_{P_X}[\log P_X(X)]}_{\text{entropy of data}}
 \end{align*} 
+\pause
+
+\item The NLL cannot be optimized directly, so VAEs use an \col{upper bound}.
+\begin{align*}
+ & NLL \leq \inf_{\underbrace{Q(Z \vert X) \in \mathcal{Q}}_{\text{min over all encoders}}} -\E_{P_X}[\underbrace{\E_{Q(Z \vert X)}[\log P_G(X \vert Z)]}_{\text{reconstruction loss}} - \underbrace{D_{KL}(Q(Z \vert X), P_Z)}_{\text{regularization loss}}]
+\end{align*}
+\pause
+
+\item Take-Away: VAEs \col{minimize an upper bound on KL divergence} between the data and the model.
+
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Using Wasserstein instead of KL}
+\begin{itemize}
+\setlength\itemsep{1em}
+\item Alternative way to measure distance between probability distributions
+\pause
+
+\item Aka Earth Mover's Distance, Kantorovich-Rubinstein Metric, Optimal Transfer Plan
+\pause
+
+\item Defined with respect to a cost function $c : \mathcal{X} \times \mathcal{X} \to \R_{+}$ as 
+\begin{align*}
+W_c(P_X, P_Y) = \inf_{\Gamma \in \mathcal{P}(X \sim P_X, Y \sim P_Y)} \E_{(X, Y) \sim \Gamma} [c(X, Y)]
+\end{align*}
+where $\Gamma(x, y)$ is the "transport plan".
+
+\begin{center}
+\includegraphics[scale=0.4]{discrete-em1}
+\includegraphics[scale=0.4]{discrete-em2}
+\end{center}
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Using Wasserstein instead of KL}
+\begin{itemize}
+\setlength\itemsep{1em}
+
+\item The objective is 
+
+\begin{align*}
+W_c(P_X, P_Y) = \inf_{\Gamma \in \mathcal{P}(X \sim P_X, Y \sim P_Y)} \E_{(X, Y) \sim \Gamma} [c(X, Y)]
+\end{align*}
+
+\pause
+
+\begin{center}
+\includegraphics[scale=0.4]{discrete-em3}
+\end{center}
+
+\pause 
+
+\item $\Gamma$ must be some joint distribution of $X, Y$ because 
+\begin{itemize}
+\item $\int_{x} \Gamma(x, y) dx = P_X(x) \Rightarrow $ Total earth leaving $x$ = total earth at $x$  
+\item $\int_{y} \Gamma(x, y) dy = P_Y(y) \Rightarrow $ Total earth entering $y$ = total earth at $y$
+\end{itemize}
+
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Wasserstein Auto-Encoder}
+\begin{itemize}
+\setlength\itemsep{1em}
+\item Consider a latent space $\mathcal{Z}$ with prior $P_Z$.  We want to find a model (i.e. decoder) $G: \mathcal{Z} \to \mathcal{X}$ that minimizes the \col{Wasserstein distance}
+\begin{align*}
+W_c(P_X, P_G) = \inf_{\Gamma \in \mathcal{P}(X \sim P_X, Y \sim P_G)} \E_{(X, Y) \sim \Gamma} [c(X, Y)]
+\end{align*}
+
+\pause
+
+\item \textbf{[Bousquet et al. (2017)]}  This is equivalent to minimizing 
+\begin{align*}
+W_c(P_X, P_G) = \inf_{\underbrace{Q: Q_Z = P_Z}_{\text{min over encoders with marginal $P_Z$}}} \E_{P_X} \underbrace{\E_{Q(Z \vert X)} [c(X, G(Z)]}_{\text{reconstruction cost}}
+\end{align*}
+where $Q_Z = \int Q(Z \vert X) P_X(X) dX$.  
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Wasserstein Auto-Encoder}
+\begin{itemize}
+\item The \col{WAE objective} relaxes the constraint $Q_Z = P_Z$ by adding a penalty.  It minimizes
+\begin{align*}
+D_{WAE}(P_X, P_G) =  \inf_{Q(Z \vert X) \in \mathcal{Q}} \E_{P_X} \E_{Q(Z \vert X)} [c(X, G(Z)]+ \lambda \cdot \mathcal{D}_Z(Q_Z, P_Z)
+\end{align*}
+where $\mathcal{D}$ is some divergence and $\lambda$ is some regularization parameter. 
+
+\pause
+
+\item Claims to fix \col{blurriness issue} of VAEs
+
+\begin{center}
+\includegraphics[scale=0.4]{wae-vae}
+\end{center}
+
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Wasserstein Auto-Encoder}
+\begin{itemize}
+\item The \col{WAE objective} minimizes
+\begin{align*}
+D_{WAE}(P_X, P_G) =  \inf_{Q(Z \vert X) \in \mathcal{Q}} \E_{P_X} \E_{Q(Z \vert X)} [c(X, G(Z))]+ \lambda \cdot \mathcal{D}_Z(Q_Z, P_Z)
+\end{align*}
+\pause
+
+\item There are two sources of customization.  
+\pause
+\begin{enumerate}
+\item Choose \col{divergence} between $Q_Z$ and $P_Z$.
+
+\pause
+\begin{center}
+\begin{tabular}{  c || c  }
+ \hline \hline 
+ WAE-GAN & WAE-MMD \\ 
+ \hline 
+ $\mathcal{D}_Z = D_{JS}$ & $\mathcal{D}_Z = MMD_k$ \\  
+ Introduce adversarial & Use unbiased \\
+ discriminator in $\mathcal{Z}$ & U-statistic estimator \\ 
+ \hline \hline   
+\end{tabular}
+\end{center}
+
+\pause
+\item Choose \col{reconstruction cost} function $c$.  
+\begin{itemize}
+\pause
+\item If $c(x, x') = \| x - x' \|_2^2$, then WAE-GAN is equivalent to AAE
+
+\pause
+\item Theoretical justification of AAE as minimizing 2-Wasserstein distance
+\end{itemize}
+
+\end{enumerate}
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Experiments}
+\begin{itemize}
+\setlength\itemsep{1em}
+\item Test VAE, WAE-GAN, WAE-MMD on MNIST and CelebA
+
+\item Record Frechet Inception Distance (FID) to assess quality of images
+
+\begin{center}
+\includegraphics[scale=0.5]{experiments}
+\end{center}
+
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{Extensions}
+\begin{center}
+\includegraphics[scale=0.3]{paper1} \\ 
+\includegraphics[scale=0.3]{paper2} \\
+\includegraphics[scale=0.3]{paper3}
+\end{center}
+\end{frame}
+
+\begin{frame}
+\frametitle{Our Project}
+\begin{itemize}
+\setlength\itemsep{1em}
+\item Build on work of Zhao et. al (2018) in applying WAEs to text
+
+\pause 
+\item Semi-Supervised Learning for transfering between different styles of English
+
+\begin{itemize}
+\pause
+\item Shakespearean English vs. Modern English
+\begin{center}
+\includegraphics[scale=0.4]{shakespeare}
+\end{center}
+
+\pause
+\item Formal English vs. Informal English
+\begin{center}
+\includegraphics[scale=0.4]{informal}
+\end{center}
+\end{itemize}
+\end{itemize}
 \end{frame}
 
 \end{document} 
