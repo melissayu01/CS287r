@@ -1,0 +1,3 @@
+[submodule "final_project/ARAE"]
+	path = final_project/ARAE
+	url = https://github.com/jakezhaojb/ARAE.git
