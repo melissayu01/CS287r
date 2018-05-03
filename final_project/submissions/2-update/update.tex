@@ -136,6 +136,7 @@
 \begin{itemize}
 \item VAEs reduce to prior-ignoring language models
 \item GANs cannot deal with discrete observations
+\item AAEs experience mode-collapse \& repeatedly generate same samples
 \end{itemize}
 \end{itemize}
 \end{frame}
@@ -143,7 +144,7 @@
 \begin{frame}
 \frametitle{Adversarially Regularized Auto-Encoder (Zhao et. al, 2017)} 
 \begin{itemize}
-\item ARAE = VAE + GAN
+\item ARAE = discrete AAE + WGAN + learned prior
 \item Improvements in semi-supervised learning
 \item State-of-the-art on \emph{unaligned} text style transfer 
 \end{itemize}
