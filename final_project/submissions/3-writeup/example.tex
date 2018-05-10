@@ -1,0 +1,216 @@
+\documentclass{article}
+
+\usepackage{times}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{subfigure}
+\usepackage{natbib}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{lipsum}
+\usepackage{todonotes}
+\usepackage[accepted]{icml2017}
+\icmltitlerunning{CS 287 Final Project Template}
+
+\newcommand{\eval}[2]{\Big|_{#1}^{#2}}
+\newcommand{\vect}[1]{\boldsymbol{#1}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\norm}[1]{\left\lVert#1\right\rVert}
+
+\begin{document}
+
+\twocolumn[
+\icmltitle{Style Transfer with Disentangled ARAEs}
+\begin{icmlauthorlist}
+  \icmlauthor{Alex Lin}{}
+\icmlauthor{Melissa Yu}{}
+\end{icmlauthorlist}
+
+\vskip 0.3in
+]
+
+\begin{abstract}
+In this project, we examine the \emph{style transfer} problem, which asks us to change one attribute of a sentence (e.g. sentiment) without altering the overall style and grammar of that sentence.  Our approach involves the Adversarially Regularized Autoencoder (ARAE) \cite{arae} to explicitly disentangle the latent attribute of interest from the other stylistic attributes that we wish to keep.  We compare the performance of this Disentangled ARAE to results from the original ARAE on the Yelp dataset.  We show that ... afdadsfasdfadfasdfadfsaf  
+\end{abstract}
+
+\section{Introduction}
+\label{sec:introduction}
+
+Example Structure:
+\begin{itemize}
+\item What is the problem of interest and what (high-level) are the current best methods for solving it?
+\item How do you plan to improve/understand/modify this or related methods?
+\item Preview your research process, list the contributions you made, and summarize your experimental findings.
+\end{itemize}
+The \emph{style transfer} problem involves
+
+\section{Background}
+While latent variable models have enjoyed lots of success in tackling computer vision problems, they have generally been less effective in the domain of natural language processing (NLP).  One particular useful application of latent variable models to NLP is the \emph{style transfer} problem,
+
+
+\section{Related Work}
+
+Example Structure:
+\begin{itemize}
+\item What 3-5 papers have been published in this space?
+\item How do these  differ from your approach?
+\item What data or methodologies do each of these works use?
+\item How do you plan to compare to these methods?
+\end{itemize}
+
+\lipsum[7-9]
+
+
+\section{Model}
+
+Example Structure:
+
+\begin{itemize}
+\item What is the formal definition of your problem?
+\item What is the precise mathematical model you are using to represent it? In almost all cases this will use the probabilistic language from class, e.g.
+  \begin{equation}
+  z \sim {\cal N}(0, \sigma^2)\label{eq:1}
+\end{equation}
+But it may also be a neural network, or a non-probabilistic loss,
+\[ h_t \gets \mathrm{RNN}(x_{t}, h_{t-1} )\]
+
+This is also a good place to reference a diagram such as Figure~\ref{fig:diagram}.
+
+\item What are the parameters or latent variables of this model that you plan on estimating or inferring? Be explicit. How many are there? Which are you assuming are given? How do these relate to the original problem description?
+\end{itemize}
+
+The basic ARAE architecture follows adversarial autoencoders (AAEs) in combining variational autoencoders (VAEs) with GANs (generative adversarial networks) \cite{arae}.  A diagram of how this model can be used for unaligned style transfer can be found in Figure 1.
+
+Given a vocabulary $\mathcal{V}$, each input to the ARAE is a sentence $\vect{x} = \{x_1, x_2, \ldots\}$ where each word $x_t \in \mathcal{V}$.  We define $\mathcal{X} = \mathcal{V}^T$ (where $T$ is the variable length of a sentence) as the code space and $\mathcal{C}$ as the latent space.  In the VAE part of the ARAE, $\vect{x}$ is passed through an encoder $q_\phi : \mathcal{X} \to \mathcal{C}$ to form a latent code $\vect{c} = q_\phi(\vect{x})$.  This code represents the stylistic attributes of the sentence.  Note that $q$ is represented in our architecture as a neural network with parameters $\phi$.
+
+The latent code is then put through a classifier $f_u : \mathcal{C} \to [0, 1]$ that returns the probability of the sentence having the attribute of interest.  (Note that in this case, we assume that the attribute is binary -- e.g. positive or negative sentiment).  Similarly, $f$ is also a neural network with parameters $u$.  
+
+Let the decision of the classifier be $y \in \{0, 1\}$, where 1 corresponds to one class and 0 correspond to the other.  During classification training, this decision is compared to the true label $y^* \in \{0, 1\}$.  
+
+Then, conditioning on the latent code $\vect{c}$ and the predicted class $y$, the decoder $r_\psi : \mathcal{C} \times \{0, 1\} \to \mathcal{X}$ returns a reconstructed sentence $\vect{x}' = r_\psi(\vect{c}, y)$.  Note that if we wanted to transfer the style of the sentence to a sentence in the other class, we could simply decode with $r_\psi(\vect{c}, 1 - y)$.  Again, $r$ is a neural network (or a series of neural networks) with parameters $\psi$.  See Section 5 for additional details.      
+
+The latent code $\vect{c}$ is adversarially regularized by a GAN so that its distribution does not deviate too far from a flexible prior.  The base distribution of the GAN is $\mathcal{N}(\vect{0}, \vect{I})$ where $\vect{I}$ is the identity matrix.  A generator $g_\theta : \mathbb{R}^{\text{dim}(\vect{I})} \to \mathcal{C}$ takes samples $\vect{v} \sim \mathcal{N}(\vect{0}, \vect{I})$ and tries to fool a corresponding discriminator $d_w : \mathcal{C} \to [0, 1]$ by using fake codes $\vect{c}' = g_\theta(\vect{v})$.  Both the generator $g$ and the discriminator $d$ are neural networks with parameters $\theta$ and $w$ respectively.
+
+            
+
+
+\begin{figure}
+  \centering
+  \missingfigure[figheight=8cm]{}
+  \caption{\label{fig:diagram} This is a good place to include a diagram showing how your model works. Examples include a graphical model or a neural network block diagram.}
+\end{figure}
+
+
+\section{Inference (or Training)}
+
+\begin{itemize}
+\item How do you plan on training your parameters / inferring the
+  states of your latent variables (MLE / MAP / Backprop / VI / EM / BP / ...)
+
+\item What are the assumptions implicit in this technique? Is it an approximation or exact? If it is an approximation what bound does it optimize?
+
+\item What is the explicit method / algorithm that you derive for learning these parameters?
+\end{itemize}
+
+\lipsum[4-8]
+
+\begin{algorithm}
+  \begin{algorithmic}
+    \STATE{\lipsum[1]}
+  \end{algorithmic}
+  \caption{Your Pseudocode}
+\end{algorithm}
+
+
+
+
+\section{Methods}
+
+\begin{itemize}
+\item What are the exact details of the dataset that you used? (Number of data points / standard or non-standard / synthetic or real / exact form of the data)
+
+\item What are the exact details of the features you computed?
+
+
+\item How did you train or run inference? (Optimization method / hyperparameter settings / amount of time ran / what did you implement versus borrow / how were baselines computed).
+
+\item What are the exact details of the metric used?
+\end{itemize}
+
+\lipsum[4-8]
+
+\section{Results}
+
+\begin{itemize}
+\item What were the results comparing previous work / baseline systems / your systems on the main task?
+\item What were the secondary results comparing the variants of your system?
+\item This section should be fact based and relatively dry. What happened, what was significant?
+\end{itemize}
+
+\begin{table*}
+  \centering
+  \missingfigure{}
+  \caption{This is usually a table. Tables with numbers are generally easier to read than graphs, so prefer when possible.}
+  \label{fig:mainres}
+\end{table*}
+
+
+\begin{table}
+  \centering
+  \missingfigure[figheight=5cm]{}
+  \caption{Secondary table or figure in results section.}
+  \label{fig:mainres}
+\end{table}
+
+\lipsum[7-11]
+
+\section{Discussion}
+
+
+
+\begin{itemize}
+\item What conclusions can you draw from the results section?
+\item Is there further analysis you can do into the results of the system? Here is a good place to include visualizations, graphs, qualitative analysis of your results.
+
+\item  What questions remain open? What did you think might work, but did not?
+\end{itemize}
+
+\lipsum[4-8]
+
+\begin{figure}
+  \centering
+  \missingfigure{}
+  \missingfigure{}
+  \missingfigure{}
+  \caption{Visualizations of the internals of the system.}
+\end{figure}
+
+\section{Conclusion}
+
+\begin{itemize}
+\item What happened?
+\item What next?
+\end{itemize}
+
+\lipsum[4-6]
+
+% \section*{Acknowledgements}
+
+% \textbf{Do not} include acknowledgements in the initial version of
+% the paper submitted for blind review.
+
+% If a paper is accepted, the final camera-ready version can (and
+% probably should) include acknowledgements. In this case, please
+% place such acknowledgements in an unnumbered section at the
+% end of the paper. Typically, this will include thanks to reviewers
+% who gave useful comments, to colleagues who contributed to the ideas,
+% and to funding agencies and corporate sponsors that provided financial
+% support.
+
+
+\bibliography{example}
+\bibliographystyle{icml2017}
+
+\end{document}
