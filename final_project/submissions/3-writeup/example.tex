@@ -37,7 +37,7 @@
 ]
 
 \begin{abstract}
-In this project, we examine the \emph{style transfer} problem, which asks us to change one attribute of a sentence (e.g. sentiment) without altering the overall style and grammar of that sentence.  Our approach involves the Adversarially Regularized Autoencoder (ARAE) \cite{arae} to explicitly disentangle the latent attribute of interest from the other stylistic attributes that we wish to keep.  We compare the performance of this Disentangled ARAE to results from the original ARAE on the Yelp dataset.
+In this paper, we examine the \emph{unaligned style transfer} problem, in which we seek to modify one attribute of a sentence (e.g. sentiment) without altering the overall style and grammar of that sentence.  Our approach builds on the Adversarially Regularized Autoencoder (ARAE) \cite{arae}, but modifies the architecture to implicitly, rather than explicitly disentangle the latent attribute of interest from the other stylistic and content attributes that we wish to preserve. We compare the performance of this Disentangled ARAE to results from the original ARAE on the 2015 Yelp reviews dataset and show that failure to explicitly disentangle label (sentiment) and style attributes through adversarial training led to improved transfer performance, but much poorer sentence fluency and consistency with the source.
 \end{abstract}
 
 \section{Introduction}
@@ -57,7 +57,9 @@ Shakespearean English: \emph{So thrive my soul --} \\
 Modern English: \emph{My soul depends on it --}
 \end{center} 
 
-Having a model that can freely switch and translate between these modes can be quite useful.  There have been models proposed that tackle this exact problem in natural language processing, such as the Adversarially Regularized Autoencoder (ARAE) \cite{arae}.  In this work, we change some aspects of this model to formulate the Disentangled ARAE for the style transfer problem.  Section 2 covers some background and Section 3 presents related work on the problem.  Section 4 formally presents the mathematical model and Section 5 covers the training procedure.  Section 6 covers methods, and Section 7 covers results and a discussion.  
+Having a model that can freely switch and translate between these modes can be quite useful.  There have been models proposed that tackle this exact problem in natural language processing, such as the Adversarially Regularized Autoencoder (ARAE) \cite{arae}.  In this work, we change some aspects of this model to formulate the Disentangled ARAE for the style transfer problem. We apply our model to the 2015 Yelp reviews dataset \cite{yelp} and show that it achieves good transfer percentages, but fails to generate fluent transferred sentences consistent with the source.
+
+The remainder of the paper is organized as follows: Section 2 covers some background and Section 3 presents related work on the problem.  Section 4 formally presents the mathematical model and Section 5 covers the training procedure.  Section 6 covers methods, and Section 7 covers results and a discussion.  
 
 \section{Background}
 While latent variable models have enjoyed success in tackling computer vision problems, they have generally been less effective in the domain of natural language processing (NLP).  One particularly useful application of latent variable models to NLP is the \emph{style transfer} problem, in which we seek to transfer the content
@@ -70,9 +72,11 @@ The problem of \emph{unaligned style transfer} seeks to perform style transfer w
 
 \subsubsection{Generative Adversarial Networks} \label{sssec:gan}
 The generative adversarial network (GAN) \cite{gan} framework establishes a min-max game between two neural networks, the generator $G$ and the discriminator $D$, in order to match the generative process to the data distribution. Suppose the generator network $G(\vect{z})$ maps some hidden representation $\vect{z}$ to the data space, and the discriminator network $D(\vect{x})$ predicts the probability that a sample $\vect{x}$ comes from the true data distribution $p_d$ (positive samples), and not $G$'s generative process (negative samples). The objective is
+
 \begin{equation}
 \min_G \max_D \ \E_{p_d(\vect{x})} [\log D(\vect{x})] + \E_{p(\vect{z})} [\log (1 - D(G(\vect{z})))]
 \end{equation}
+
 The network consists of the discriminator, which achieves the best classification accuracy over samples of $\vect{x}$, and the generator, which maximally confuses this best discriminator, so that $D(\vect{x}) = 1/2$.
 
 \subsubsection{Semi-Supervised Adversarial Autoencoders} \label{sssec:aae}
@@ -113,7 +117,7 @@ The latent code $\vect{c}$ is adversarially regularized by a GAN so that its dis
 
 The Disentangled ARAE, our proposed modification to this model, aims to explicitly separate the attribute of interest $y^*$ from the style of the sentence.  Here, "style" refers to all latent variables except for $y^*$.  The motivation is that working with this structure allows us to not have to adversarially train the classifier, which could be unstable and also increase the computational time of training the model.  Our inspiration comes from the completely disentangled structure of the original Adversarial Autoencoder that was used for supervised and semi-supervised training \cite{aae}.
 
-The main change that we make is to have the latent code $\vect{c}$ be passed through a multilayer perceptron $a_\alpha : \mathcal{C} \to \mathcal{Z}$  where $\alpha$ is the parameters of the network and $\mathcal{Z}$ is the latent style space.  The result is the latent style $\vect{z} \in \mathcal{Z}$.  Separately, $\vect{c}$ is also passed through the classifier $f_u$ to generate $y$ from $f_u(\vect{c})$.  Thus, we have disentangled the style from the class.  
+The main change that we make is to have the latent code $\vect{c}$ be passed through a multilayer perceptron $a_\alpha : \mathcal{C} \to \mathcal{Z}$  where $\alpha$ is the parameters of the network and $\mathcal{Z}$ is the latent style space.  The result is the latent style $\vect{z} \in \mathcal{Z}$.  Separately, $\vect{c}$ is also passed through the classifier $f_u$ to generate $y$ from $f_u(\vect{c})$.  This modification enables us to disentangle the sentiment from the other features of a text.  
 
 The style $\vect{z}$ (not the code $\vect{c}$) will now be passed along with the class $y$ to the decoder, redefined as $r_\psi : \mathcal{Z} \times \{0, 1\} \to \mathcal{X}$.  In addition, the generator $g_\theta : \mathbb{R}^{\text{dim}(\vect{I})} \to \mathcal{Z}$ of the Disentangled ARAE is used to regularize $\vect{z}$ instead of $\vect{c}$.  See Figure 1 for the architecture of the model.       
 
